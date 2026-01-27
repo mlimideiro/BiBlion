@@ -6,6 +6,8 @@
     --accent: #bb86fc;
     --text-primary: #e0e0e0;
     --text-secondary: #a0a0a0;
+    --book-w: 180px;
+    --book-h: 260px;
 }
 
 body {
@@ -100,7 +102,7 @@ body {
 /* Book List Grid */
 .book-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(var(--book-w), 1fr));
     gap: 30px;
     padding-top: 30px;
     width: 100%;
@@ -124,7 +126,7 @@ body {
 }
 
 .book-cover {
-    height: 260px;
+    height: var(--book-h);
     background: #252525;
     position: relative;
     overflow: hidden;
@@ -178,8 +180,11 @@ body {
 /* Search Bar */
 .search-bar {
     width: 100%;
-    max-width: 600px;
+    max-width: 800px;
     margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 15px;
     position: relative;
     z-index: 10;
 }
@@ -670,4 +675,36 @@ body {
     align-items: center;
     gap: 8px;
     padding: 8px 20px;
+}
+
+.size-selector-pills {
+    display: flex;
+    background: #2d2d2d;
+    padding: 5px;
+    border-radius: 30px;
+    gap: 2px;
+}
+
+.size-btn {
+    background: none;
+    border: none;
+    color: #888;
+    padding: 8px 15px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.size-btn:hover {
+    color: #ccc;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.size-btn.active {
+    color: var(--accent);
+    background: rgba(187, 134, 252, 0.15);
+    font-weight: 800;
+    transform: scale(1.1);
 }

@@ -2,9 +2,11 @@ import React, { useState } from 'react'
 
 interface Props {
     onSearch: (query: string) => void
+    thumbnailSize: 'S' | 'M' | 'L' | 'XL'
+    setThumbnailSize: (size: 'S' | 'M' | 'L' | 'XL') => void
 }
 
-export const SearchBar: React.FC<Props> = ({ onSearch }) => {
+export const SearchBar: React.FC<Props> = ({ onSearch, thumbnailSize, setThumbnailSize }) => {
     const [query, setQuery] = useState('')
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,6 +24,18 @@ export const SearchBar: React.FC<Props> = ({ onSearch }) => {
                 onChange={handleChange}
                 className="search-input"
             />
+
+            <div className="size-selector-pills">
+                {(['S', 'M', 'L', 'XL'] as const).map(size => (
+                    <button
+                        key={size}
+                        onClick={() => setThumbnailSize(size)}
+                        className={`size-btn ${thumbnailSize === size ? 'active' : ''}`}
+                    >
+                        {size}
+                    </button>
+                ))}
+            </div>
         </div>
     )
 }

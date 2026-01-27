@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { BookListItem } from './components/BookListItem'
 import { SearchBar } from './components/SearchBar'
-import { Settings, Download, X, Sparkles, LayoutGrid, Trash2 } from 'lucide-react'
+import { Trash2, LayoutGrid, Settings, Download, X, Sparkles } from 'lucide-react'
 import { SettingsModal } from './components/SettingsModal'
 import './index.css'
 import './components/components.css'
@@ -38,8 +38,19 @@ function App() {
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [isSelectionMode, setIsSelectionMode] = useState(false)
     const [selectedIsbns, setSelectedIsbns] = useState<string[]>([])
+    const [isRepairing, setIsRepairing] = useState<string | null>(null)
+    const [thumbnailSize, setThumbnailSize] = useState<'S' | 'M' | 'L' | 'XL'>(
+        (localStorage.getItem('thumbSize') as any) || 'L'
+    )
     const [searchQuery, setSearchQuery] = useState('')
     const menuRef = useRef<HTMLDivElement>(null)
+
+    const THUMB_SIZES = {
+        S: { w: '100px', h: '145px' },
+        M: { w: '140px', h: '200px' },
+        L: { w: '180px', h: '260px' },
+        XL: { w: '240px', h: '345px' }
+    }
 
     useEffect(() => {
         // Initial fetch
@@ -101,9 +112,17 @@ function App() {
         setSearchQuery(query)
     }
 
-    const handleSwitchLibrary = (id: string) => {
+    // Apply thumbnail size to CSS variables
+    useEffect(() => {
+        const size = THUMB_SIZES[thumbnailSize]
+        document.documentElement.style.setProperty('--book-w', size.w)
+        document.documentElement.style.setProperty('--book-h', size.h)
+        localStorage.setItem('thumbSize', thumbnailSize)
+    }, [thumbnailSize])
+
+    const handleSwitchLibrary = async (libId: string) => {
         if (!config) return
-        const newConfig = { ...config, activeLibraryId: id }
+        const newConfig = { ...config, activeLibraryId: libId }
         window.electron.saveConfig(newConfig).then(setConfig)
     }
 
@@ -244,7 +263,7 @@ function App() {
                                     onChange={(e) => handleSwitchLibrary(e.target.value)}
                                 >
                                     <option value="">Todas las bibliotecas</option>
-                                    <option value="unassigned">⚠️ Sin asignar</option>
+                                    <option value="unassigned">Sin asignar</option>
                                     {config.libraries.map(l => (
                                         <option key={l.id} value={l.id}>{l.name}</option>
                                     ))}
@@ -294,7 +313,11 @@ function App() {
             </header>
 
             <div className="main-content">
-                <SearchBar onSearch={handleSearch} />
+                <SearchBar
+                    onSearch={handleSearch}
+                    thumbnailSize={thumbnailSize}
+                    setThumbnailSize={setThumbnailSize}
+                />
 
                 <div className="book-list">
                     {filteredBooks.map(book => (
@@ -323,127 +346,133 @@ function App() {
                 </div>
             </div>
 
-            {isSelectionMode && selectedIsbns.length > 0 && (
-                <div className="bulk-action-bar">
-                    <div className="bulk-info">
-                        {selectedIsbns.length} seleccionados
+            {
+                isSelectionMode && selectedIsbns.length > 0 && (
+                    <div className="bulk-action-bar">
+                        <div className="bulk-info">
+                            {selectedIsbns.length} seleccionados
+                        </div>
+                        <div className="bulk-actions">
+                            <select
+                                className="action-btn"
+                                onChange={(e) => {
+                                    handleBulkMove(e.target.value)
+                                    e.target.value = ""
+                                }}
+                                defaultValue=""
+                            >
+                                <option value="" disabled>Mover a...</option>
+                                {config?.libraries.map(l => (
+                                    <option key={l.id} value={l.id}>{l.name}</option>
+                                ))}
+                            </select>
+                            <button className="action-btn danger delete-btn" onClick={handleBulkDelete}>
+                                <Trash2 size={18} />
+                                <span>Eliminar</span>
+                            </button>
+                        </div>
                     </div>
-                    <div className="bulk-actions">
-                        <select
-                            className="action-btn"
-                            onChange={(e) => {
-                                handleBulkMove(e.target.value)
-                                e.target.value = ""
-                            }}
-                            defaultValue=""
-                        >
-                            <option value="" disabled>Mover a...</option>
-                            {config?.libraries.map(l => (
-                                <option key={l.id} value={l.id}>{l.name}</option>
-                            ))}
-                        </select>
-                        <button className="action-btn danger delete-btn" onClick={handleBulkDelete}>
-                            <Trash2 size={18} />
-                            <span>Eliminar</span>
-                        </button>
-                    </div>
-                </div>
-            )}
-            {selectedBook && (
-                <div className="modal-overlay" onClick={() => setSelectedBook(null)}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()}>
-                        <button className="close-btn" onClick={() => setSelectedBook(null)}><X /></button>
-                        <div className="modal-body">
-                            <div className="modal-cover">
-                                {selectedBook.coverPath ? (
-                                    <img src={selectedBook.coverPath.startsWith('http') ? selectedBook.coverPath : `file://${selectedBook.coverPath}`} alt={selectedBook.title} />
-                                ) : (
-                                    <div className="placeholder-cover">Sin Tapa</div>
-                                )}
-                            </div>
-                            <div className="modal-info" style={{ display: 'flex', flexDirection: 'column' }}>
-                                <div>
-                                    <h2 style={{ margin: '0 0 10px 0', paddingRight: 40 }}>{selectedBook.title}</h2>
-                                    <p className="modal-author">{selectedBook.authors.join(', ')}</p>
-                                    <div className="modal-meta">
-                                        <p><strong>ISBN:</strong> {selectedBook.isbn}</p>
-                                        {selectedBook.publisher && <p><strong>Editorial:</strong> {selectedBook.publisher}</p>}
-
-                                        <div className="modal-library-move" style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <strong>Biblioteca:</strong>
-                                            <select
-                                                value={selectedBook.libraryId || 'default'}
-                                                onChange={(e) => handleMoveLibrary(e.target.value)}
-                                                style={{
-                                                    background: '#333',
-                                                    color: 'white',
-                                                    border: '1px solid #444',
-                                                    borderLeft: '4px solid var(--accent)',
-                                                    borderRadius: '4px',
-                                                    padding: '5px 10px',
-                                                    cursor: 'pointer',
-                                                    fontSize: '0.9rem'
-                                                }}
-                                            >
-                                                {config?.libraries.map(l => (
-                                                    <option key={l.id} value={l.id}>{l.name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    {selectedBook.description ? (
-                                        <div className="modal-desc">
-                                            <h4>Resumen:</h4>
-                                            <p>{selectedBook.description}</p>
-                                        </div>
+                )
+            }
+            {
+                selectedBook && (
+                    <div className="modal-overlay" onClick={() => setSelectedBook(null)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()}>
+                            <button className="close-btn" onClick={() => setSelectedBook(null)}><X /></button>
+                            <div className="modal-body">
+                                <div className="modal-cover">
+                                    {selectedBook.coverPath ? (
+                                        <img src={selectedBook.coverPath.startsWith('http') ? selectedBook.coverPath : `file://${selectedBook.coverPath}`} alt={selectedBook.title} />
                                     ) : (
-                                        <p className="modal-desc"><em>Sin resumen disponible.</em></p>
+                                        <div className="placeholder-cover">Sin Tapa</div>
                                     )}
                                 </div>
+                                <div className="modal-info" style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <div>
+                                        <h2 style={{ margin: '0 0 10px 0', paddingRight: 40 }}>{selectedBook.title}</h2>
+                                        <p className="modal-author">{selectedBook.authors.join(', ')}</p>
+                                        <div className="modal-meta">
+                                            <p><strong>ISBN:</strong> {selectedBook.isbn}</p>
+                                            {selectedBook.publisher && <p><strong>Editorial:</strong> {selectedBook.publisher}</p>}
 
-                                <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #333' }}>
-                                    <button
-                                        className="repair-btn"
-                                        onClick={handleRepair}
-                                        disabled={repairing}
-                                    >
-                                        <Sparkles size={18} /> {repairing ? 'Buscando...' : 'Reparar Datos'}
-                                    </button>
+                                            <div className="modal-library-move" style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <strong>Biblioteca:</strong>
+                                                <select
+                                                    value={selectedBook.libraryId || 'default'}
+                                                    onChange={(e) => handleMoveLibrary(e.target.value)}
+                                                    style={{
+                                                        background: '#333',
+                                                        color: 'white',
+                                                        border: '1px solid #444',
+                                                        borderLeft: '4px solid var(--accent)',
+                                                        borderRadius: '4px',
+                                                        padding: '5px 10px',
+                                                        cursor: 'pointer',
+                                                        fontSize: '0.9rem'
+                                                    }}
+                                                >
+                                                    {config?.libraries.map(l => (
+                                                        <option key={l.id} value={l.id}>{l.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        {selectedBook.description ? (
+                                            <div className="modal-desc">
+                                                <h4>Resumen:</h4>
+                                                <p>{selectedBook.description}</p>
+                                            </div>
+                                        ) : (
+                                            <p className="modal-desc"><em>Sin resumen disponible.</em></p>
+                                        )}
+                                    </div>
 
-                                    <button
-                                        onClick={handleDelete}
-                                        style={{
-                                            background: '#ef4444',
-                                            color: 'white',
-                                            border: 'none',
-                                            padding: '12px 24px',
-                                            borderRadius: '8px',
-                                            cursor: 'pointer',
-                                            fontWeight: 'bold',
-                                            fontSize: '1rem',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '10px',
-                                            boxShadow: '0 4px 6px rgba(0,0,0,0.2)'
-                                        }}
-                                    >
-                                        🗑️ Eliminar
-                                    </button>
+                                    <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #333' }}>
+                                        <button
+                                            className="repair-btn"
+                                            onClick={handleRepair}
+                                            disabled={repairing}
+                                        >
+                                            <Sparkles size={18} /> {repairing ? 'Buscando...' : 'Reparar Datos'}
+                                        </button>
+
+                                        <button
+                                            onClick={handleDelete}
+                                            style={{
+                                                background: '#ef4444',
+                                                color: 'white',
+                                                border: 'none',
+                                                padding: '12px 24px',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                fontWeight: 'bold',
+                                                fontSize: '1rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '10px',
+                                                boxShadow: '0 4px 6px rgba(0,0,0,0.2)'
+                                            }}
+                                        >
+                                            🗑️ Eliminar
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
-            {settingsOpen && config && (
-                <SettingsModal
-                    libraries={config.libraries}
-                    onClose={() => setSettingsOpen(false)}
-                    onSave={handleSaveLibraries}
-                />
-            )}
-        </div>
+            {
+                settingsOpen && config && (
+                    <SettingsModal
+                        libraries={config.libraries}
+                        onClose={() => setSettingsOpen(false)}
+                        onSave={handleSaveLibraries}
+                    />
+                )
+            }
+        </div >
     )
 }
 
