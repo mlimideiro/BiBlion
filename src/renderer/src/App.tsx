@@ -47,7 +47,12 @@ function App() {
     )
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedTag, setSelectedTag] = useState<string | null>(null)
+    const [isEditingBook, setIsEditingBook] = useState(false)
+    const [showScraperPanel, setShowScraperPanel] = useState(false)
+    const [scraperUrl, setScraperUrl] = useState('')
+    const [bookMenuOpen, setBookMenuOpen] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
+    const bookMenuRef = useRef<HTMLDivElement>(null)
 
     const THUMB_SIZES = {
         S: { w: '100px', h: '145px' },
@@ -81,6 +86,9 @@ function App() {
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
                 setMenuOpen(false)
+            }
+            if (bookMenuRef.current && !bookMenuRef.current.contains(event.target as Node)) {
+                setBookMenuOpen(false)
             }
         }
         document.addEventListener('mousedown', handleClickOutside)
@@ -277,6 +285,40 @@ function App() {
         setSelectedBook(updatedBook)
     }
 
+    const handleEditSave = async (updatedData: Partial<Book>) => {
+        if (!selectedBook) return
+        try {
+            const updatedBook = { ...selectedBook, ...updatedData }
+            const updatedBooks = await window.electron.saveBook(updatedBook)
+            setBooks(updatedBooks)
+            setSelectedBook(updatedBook)
+            setIsEditingBook(false)
+        } catch (e) {
+            alert("Error al guardar los cambios")
+        }
+    }
+
+    const handleScrape = async () => {
+        if (!scraperUrl) return
+        try {
+            const data = await window.electron.scrapeMetadata(scraperUrl)
+            if (data && selectedBook) {
+                const updatedBook = { ...selectedBook, ...data }
+                // Persist the changes immediately
+                const updatedBooks = await window.electron.saveBook(updatedBook)
+                setBooks(updatedBooks)
+                setSelectedBook(updatedBook)
+                setScraperUrl('')
+                setShowScraperPanel(false)
+                alert("¡Datos capturados con éxito!")
+            } else {
+                alert("No se pudo obtener información de esa URL.")
+            }
+        } catch (e) {
+            alert("Error al capturar datos: " + (e as Error).message)
+        }
+    }
+
     return (
         <div className="container">
             <header className="app-header">
@@ -430,9 +472,31 @@ function App() {
             }
             {
                 selectedBook && (
-                    <div className="modal-overlay" onClick={() => setSelectedBook(null)}>
+                    <div className="modal-overlay" onClick={() => { setSelectedBook(null); setIsEditingBook(false); setShowScraperPanel(false); }}>
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
-                            <button className="close-btn" onClick={() => setSelectedBook(null)}><X /></button>
+                            <div className="modal-actions-header">
+                                <div className="book-options-container" ref={bookMenuRef}>
+                                    <button
+                                        className={`icon-btn ${bookMenuOpen ? 'active' : ''}`}
+                                        onClick={() => setBookMenuOpen(!bookMenuOpen)}
+                                        title="Opciones"
+                                    >
+                                        <Settings size={20} />
+                                    </button>
+
+                                    {bookMenuOpen && (
+                                        <div className="book-dropdown-menu">
+                                            <div className="menu-item" onClick={() => { setIsEditingBook(!isEditingBook); setBookMenuOpen(false); }}>
+                                                {isEditingBook ? 'Ver Detalles' : 'Editar Datos'}
+                                            </div>
+                                            <div className="menu-item" onClick={() => { setShowScraperPanel(!showScraperPanel); setBookMenuOpen(false); }}>
+                                                {showScraperPanel ? 'Ocultar Captura' : 'Capturar desde URL'}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <button className="close-btn" onClick={() => { setSelectedBook(null); setIsEditingBook(false); setShowScraperPanel(false); }}><X /></button>
+                            </div>
                             <div className="modal-body">
                                 <div className="modal-cover">
                                     {selectedBook.coverPath ? (
@@ -442,111 +506,159 @@ function App() {
                                     )}
                                 </div>
                                 <div className="modal-info" style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <div>
-                                        <h2 style={{ margin: '0 0 10px 0', paddingRight: 40 }}>{selectedBook.title}</h2>
-                                        <p className="modal-author">{selectedBook.authors.join(', ')}</p>
-                                        <div className="modal-meta">
-                                            <p><strong>ISBN:</strong> {selectedBook.isbn}</p>
-                                            {selectedBook.publisher && <p><strong>Editorial:</strong> {selectedBook.publisher}</p>}
-                                            {selectedBook.pageCount && <p><strong>Páginas:</strong> {selectedBook.pageCount}</p>}
+                                    {isEditingBook ? (
+                                        <div className="edit-mode-container">
+                                            <input
+                                                className="edit-input"
+                                                defaultValue={selectedBook.title}
+                                                onBlur={(e) => handleEditSave({ title: e.target.value })}
+                                                placeholder="Título del libro"
+                                            />
+                                            <input
+                                                className="edit-input"
+                                                defaultValue={selectedBook.authors.join(', ')}
+                                                onBlur={(e) => handleEditSave({ authors: e.target.value.split(',').map(a => a.trim()).filter(a => a) })}
+                                                placeholder="Autores (separados por coma)"
+                                            />
+                                            <div className="modal-meta">
+                                                <div style={{ display: 'flex', gap: '10px' }}>
+                                                    <input
+                                                        className="edit-input"
+                                                        defaultValue={selectedBook.publisher || ''}
+                                                        onBlur={(e) => handleEditSave({ publisher: e.target.value })}
+                                                        placeholder="Editorial"
+                                                    />
+                                                    <input
+                                                        className="edit-input"
+                                                        type="number"
+                                                        defaultValue={selectedBook.pageCount || ''}
+                                                        onBlur={(e) => handleEditSave({ pageCount: parseInt(e.target.value) || 0 })}
+                                                        placeholder="Páginas"
+                                                    />
+                                                </div>
+                                                <input
+                                                    className="edit-input"
+                                                    defaultValue={selectedBook.coverPath || ''}
+                                                    onBlur={(e) => handleEditSave({ coverPath: e.target.value })}
+                                                    placeholder="URL de la tapa"
+                                                />
+                                            </div>
+                                            <textarea
+                                                className="edit-textarea"
+                                                defaultValue={selectedBook.description || ''}
+                                                onBlur={(e) => handleEditSave({ description: e.target.value })}
+                                                placeholder="Resumen del libro"
+                                            />
 
-                                            <div className="modal-library-move" style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <strong>Biblioteca:</strong>
-                                                <select
-                                                    value={selectedBook.libraryId || ""}
-                                                    onChange={(e) => handleMoveLibrary(e.target.value)}
-                                                    style={{
-                                                        background: '#333',
-                                                        color: 'white',
-                                                        border: '1px solid #444',
-                                                        borderLeft: '4px solid var(--accent)',
-                                                        borderRadius: '4px',
-                                                        padding: '5px 10px',
-                                                        cursor: 'pointer',
-                                                        fontSize: '0.9rem',
-                                                        width: '100%',
-                                                        maxWidth: '200px'
-                                                    }}
-                                                >
-                                                    <option value="">(Sin Asignar)</option>
-                                                    {config?.libraries.map(l => (
-                                                        <option key={l.id} value={l.id}>{l.name}</option>
-                                                    ))}
-                                                </select>
+                                            <div className="edit-actions">
+                                                <button className="action-btn" onClick={() => setIsEditingBook(false)}>Terminar Edición</button>
                                             </div>
                                         </div>
-                                        {selectedBook.description ? (
-                                            <div className="modal-desc">
-                                                <h4>Resumen:</h4>
-                                                <p>{selectedBook.description}</p>
-                                            </div>
-                                        ) : (
-                                            <p className="modal-desc"><em>Sin resumen disponible.</em></p>
-                                        )}
+                                    ) : (
+                                        <>
+                                            <div>
+                                                <h2 style={{ margin: '0 0 10px 0', paddingRight: 40 }}>{selectedBook.title}</h2>
+                                                <p className="modal-author">{selectedBook.authors.join(', ')}</p>
+                                                <div className="modal-meta">
+                                                    <p><strong>ISBN:</strong> {selectedBook.isbn}</p>
+                                                    {selectedBook.publisher && <p><strong>Editorial:</strong> {selectedBook.publisher}</p>}
+                                                    {selectedBook.pageCount && <p><strong>Páginas:</strong> {selectedBook.pageCount}</p>}
 
-                                        <div className="book-tags-section" style={{ marginTop: '15px' }}>
-                                            <h4>Etiquetas:</h4>
-                                            <div className="book-tags-list">
-                                                {selectedBook.tags?.map(tag => (
-                                                    <span key={tag} className="book-tag-badge">
-                                                        {tag}
-                                                        <button className="remove-tag-btn" onClick={() => handleRemoveTagFromBook(tag)}>
-                                                            <X size={12} />
-                                                        </button>
-                                                    </span>
-                                                ))}
-                                                {config?.tags.filter(t => !selectedBook.tags?.includes(t)).length! > 0 && (
-                                                    <select
-                                                        className="add-tag-btn"
-                                                        value=""
-                                                        onChange={(e) => {
-                                                            handleAddTagToBook(e.target.value)
-                                                            e.target.value = ""
-                                                        }}
-                                                    >
-                                                        <option value="" disabled>+ Agregar etiqueta</option>
-                                                        {config?.tags
-                                                            .filter(t => !selectedBook.tags?.includes(t))
-                                                            .map(tag => <option key={tag} value={tag}>{tag}</option>)
-                                                        }
-                                                    </select>
+                                                    <div className="modal-library-move" style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                        <strong>Biblioteca:</strong>
+                                                        <select
+                                                            value={selectedBook.libraryId || ""}
+                                                            onChange={(e) => handleMoveLibrary(e.target.value)}
+                                                            style={{
+                                                                background: '#333',
+                                                                color: 'white',
+                                                                border: '1px solid #444',
+                                                                borderLeft: '4px solid var(--accent)',
+                                                                borderRadius: '4px',
+                                                                padding: '5px 10px',
+                                                                cursor: 'pointer',
+                                                                fontSize: '0.9rem',
+                                                                width: '100%',
+                                                                maxWidth: '200px'
+                                                            }}
+                                                        >
+                                                            <option value="">(Sin Asignar)</option>
+                                                            {config?.libraries.map(l => (
+                                                                <option key={l.id} value={l.id}>{l.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                {selectedBook.description ? (
+                                                    <div className="modal-desc">
+                                                        <h4>Resumen:</h4>
+                                                        <p>{selectedBook.description}</p>
+                                                    </div>
+                                                ) : (
+                                                    <p className="modal-desc"><em>Sin resumen disponible.</em></p>
                                                 )}
-                                                {config?.tags.length === 0 && (
-                                                    <small style={{ color: '#666' }}>No hay etiquetas definidas en configuración.</small>
-                                                )}
+
+                                                <div className="book-tags-section" style={{ marginTop: '15px' }}>
+                                                    <h4>Etiquetas:</h4>
+                                                    <div className="book-tags-list">
+                                                        {selectedBook.tags?.map(tag => (
+                                                            <span key={tag} className="book-tag-badge">
+                                                                {tag}
+                                                                <button className="remove-tag-btn" onClick={() => handleRemoveTagFromBook(tag)}>
+                                                                    <X size={12} />
+                                                                </button>
+                                                            </span>
+                                                        ))}
+                                                        {config?.tags.filter(t => !selectedBook.tags?.includes(t)).length! > 0 && (
+                                                            <select
+                                                                className="add-tag-btn"
+                                                                value=""
+                                                                onChange={(e) => {
+                                                                    handleAddTagToBook(e.target.value)
+                                                                    e.target.value = ""
+                                                                }}
+                                                            >
+                                                                <option value="" disabled>+ Agregar etiqueta</option>
+                                                                {config?.tags
+                                                                    .filter(t => !selectedBook.tags?.includes(t))
+                                                                    .map(tag => (
+                                                                        <option key={tag} value={tag}>{tag}</option>
+                                                                    ))
+                                                                }
+                                                            </select>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </div>
 
-                                    <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #333' }}>
-                                        <button
-                                            className="repair-btn"
-                                            onClick={handleRepair}
-                                            disabled={repairing}
-                                        >
-                                            <Sparkles size={18} /> {repairing ? 'Buscando...' : 'Reparar Datos'}
-                                        </button>
+                                            {showScraperPanel && (
+                                                <div className="scraper-panel">
+                                                    <h4><Sparkles size={16} /> Capturar desde URL</h4>
+                                                    <div className="scraper-input-group">
+                                                        <input
+                                                            className="edit-input"
+                                                            style={{ marginBottom: 0 }}
+                                                            placeholder="Pegar link (Cúspide, etc.)"
+                                                            value={scraperUrl}
+                                                            onChange={(e) => setScraperUrl(e.target.value)}
+                                                        />
+                                                        <button className="scraper-btn" onClick={handleScrape}>Capturar</button>
+                                                    </div>
+                                                </div>
+                                            )}
 
-                                        <button
-                                            onClick={handleDelete}
-                                            style={{
-                                                background: '#ef4444',
-                                                color: 'white',
-                                                border: 'none',
-                                                padding: '12px 24px',
-                                                borderRadius: '8px',
-                                                cursor: 'pointer',
-                                                fontWeight: 'bold',
-                                                fontSize: '1rem',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '10px',
-                                                boxShadow: '0 4px 6px rgba(0,0,0,0.2)'
-                                            }}
-                                        >
-                                            🗑️ Eliminar
-                                        </button>
-                                    </div>
+                                            <div className="modal-footer" style={{ border: 'none', padding: '20px 0 0 0', marginTop: 'auto' }}>
+                                                <button className="repair-btn" onClick={handleRepair} disabled={repairing}>
+                                                    <Sparkles size={18} />
+                                                    <span>{repairing ? 'Buscando...' : 'Reparar Datos'}</span>
+                                                </button>
+                                                <button className="action-btn danger" onClick={handleDelete}>
+                                                    <Trash2 size={18} />
+                                                    <span>Eliminar</span>
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>

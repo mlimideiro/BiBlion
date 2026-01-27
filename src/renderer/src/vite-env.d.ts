@@ -17,6 +17,7 @@ declare global {
             saveConfig: (config: any) => Promise<any>
             onConfigUpdate: (callback: (event: any, config: any) => void) => void
             repairMetadata: (isbn: string) => Promise<any>
+            scrapeMetadata: (url: string) => Promise<any>
         }
     }
 }

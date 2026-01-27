@@ -3,10 +3,12 @@ import path from 'path'
 import { DataManager } from './dataManager'
 import { startServer } from './server'
 import { MetadataService } from './metadataService'
+import { ScraperService } from './scraperService'
 
 let mainWindow: BrowserWindow | null = null
 const dataManager = new DataManager()
 const metadataService = new MetadataService()
+const scraperService = new ScraperService()
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -69,6 +71,11 @@ app.whenReady().then(() => {
     // Metadata Repair Handler
     ipcMain.handle('repair-metadata', async (_event, isbn) => {
         const result = await metadataService.fetchByISBN(isbn)
+        return result
+    })
+
+    ipcMain.handle('scrape-metadata', async (_event, url) => {
+        const result = await scraperService.scrape(url)
         return result
     })
 

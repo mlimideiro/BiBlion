@@ -74,16 +74,17 @@
   },
   {
     "isbn": "9788418227196",
-    "title": "El viaje de Ida",
+    "title": "El Viaje De Ida - Virginia Woolf",
     "authors": [
       "Beatriz Doumerc",
       "Ayax Barnes"
     ],
     "pageCount": 34,
-    "coverPath": "",
+    "coverPath": "https://http2.mlstatic.com/D_NQ_NP_717257-MLA49411666946_032022-O.webp",
     "createdAt": "2026-01-27T14:21:57.268Z",
-    "updatedAt": "2026-01-27T14:25:04.673Z",
-    "libraryId": "1769470701100"
+    "updatedAt": "2026-01-27T23:38:31.057Z",
+    "libraryId": "1769470701100",
+    "description": "Número de páginas: 464. | ISBN: 9788418227196."
   },
   {
     "isbn": "9789877693898",
