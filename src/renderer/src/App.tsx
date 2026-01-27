@@ -169,6 +169,14 @@ function App() {
         }
     }
 
+    const handleMoveLibrary = async (libraryId: string) => {
+        if (!selectedBook) return
+        const updatedBook = { ...selectedBook, libraryId }
+        const updatedBooks = await window.electron.saveBook(updatedBook)
+        setBooks(updatedBooks)
+        setSelectedBook(updatedBook)
+    }
+
     return (
         <div className="container">
             <header className="app-header">
@@ -241,7 +249,7 @@ function App() {
             {selectedBook && (
                 <div className="modal-overlay" onClick={() => setSelectedBook(null)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
-                        <button className="close-btn" onClick={() => setSelectedBook(null)}><X size={32} /></button>
+                        <button className="close-btn" onClick={() => setSelectedBook(null)}><X /></button>
                         <div className="modal-body">
                             <div className="modal-cover">
                                 {selectedBook.coverPath ? (
@@ -257,6 +265,28 @@ function App() {
                                     <div className="modal-meta">
                                         <p><strong>ISBN:</strong> {selectedBook.isbn}</p>
                                         {selectedBook.publisher && <p><strong>Editorial:</strong> {selectedBook.publisher}</p>}
+
+                                        <div className="modal-library-move" style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <strong>Biblioteca:</strong>
+                                            <select
+                                                value={selectedBook.libraryId || 'default'}
+                                                onChange={(e) => handleMoveLibrary(e.target.value)}
+                                                style={{
+                                                    background: '#333',
+                                                    color: 'white',
+                                                    border: '1px solid #444',
+                                                    borderLeft: '4px solid var(--accent)',
+                                                    borderRadius: '4px',
+                                                    padding: '5px 10px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.9rem'
+                                                }}
+                                            >
+                                                {config?.libraries.map(l => (
+                                                    <option key={l.id} value={l.id}>{l.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     </div>
                                     {selectedBook.description ? (
                                         <div className="modal-desc">

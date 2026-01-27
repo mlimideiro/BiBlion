@@ -243,25 +243,36 @@ body {
 .close-btn {
     position: absolute;
     top: 15px;
-    right: 15px;
-    background: none;
+    right: 25px;
+    background: var(--accent);
     border: none;
-    color: #fff;
-    font-size: 2rem;
+    color: #000000 !important;
+    /* Force black icon */
     cursor: pointer;
-    z-index: 10;
-    width: 40px;
-    height: 40px;
+    z-index: 1001;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.2);
-    transition: background 0.2s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    transition: all 0.2s;
+    padding: 0;
 }
 
 .close-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: #ffffff;
+    transform: scale(1.1);
+}
+
+.close-btn svg {
+    width: 20px !important;
+    height: 20px !important;
+    stroke: #000000 !important;
+    /* Absolute force */
+    stroke-width: 2.5px !important;
+    display: block;
 }
 
 /* Animations */
