@@ -189,16 +189,18 @@ function MobileApp() {
     }
 
     const handleLookup = async (isbn: string, isBurst: boolean) => {
+        const normalized = isbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
         if (!isBurst) setMode('processing')
 
-        if (sessionIsbns.current.has(isbn)) {
-            updateStatus(`Ya en cola: ${isbn}`, 'warning')
+        if (sessionIsbns.current.has(normalized)) {
+            updateStatus(`Ya en cola: ${normalized}`, 'warning')
             return
         }
 
-        sessionIsbns.current.add(isbn)
+        sessionIsbns.current.add(normalized)
+        const currentIsbn = normalized
         const newPending: BookMetadata = {
-            isbn, title: 'Buscando...', authors: [], status: 'loading'
+            isbn: currentIsbn, title: 'Buscando...', authors: [], status: 'loading'
         }
 
         setPendingBooks(prev => [newPending, ...prev])
@@ -207,14 +209,14 @@ function MobileApp() {
         try {
             const res = await axios.get(`/api/lookup/${isbn}`)
             setPendingBooks(prev => prev.map(b =>
-                b.isbn === isbn ? { ...res.data, isbn, status: 'ready' } : b
+                b.isbn === currentIsbn ? { ...res.data, isbn: currentIsbn, status: 'ready' } : b
             ))
             updateStatus(`¡Listo! ${isbn}`, 'success')
             if (!isBurst) setMode('result')
         } catch (err) {
             updateStatus(`Falló ${isbn}`, 'error')
             setPendingBooks(prev => prev.map(b =>
-                b.isbn === isbn ? { ...b, title: 'No encontrado', status: 'error' } : b
+                b.isbn === currentIsbn ? { ...b, title: 'No encontrado', status: 'error' } : b
             ))
             if (!isBurst) setMode('idle')
         }

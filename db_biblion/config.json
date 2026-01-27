@@ -9,5 +9,8 @@
       "name": "Biblio Chica"
     }
   ],
-  "activeLibraryId": ""
+  "activeLibraryId": "default",
+  "tags": [
+    "libro objeto"
+  ]
 }

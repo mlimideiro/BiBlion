@@ -302,6 +302,121 @@ body {
     transform: scale(1.1);
 }
 
+/* Tags & Settings Logic */
+.settings-section {
+    padding: 0;
+    margin-bottom: 25px;
+}
+
+.settings-section:not(:last-child) {
+    border-bottom: 1px solid #333;
+    padding-bottom: 25px;
+}
+
+.tags-manager-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.tag-manager-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #333;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid #444;
+}
+
+.tag-badge-ui {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #eee;
+}
+
+.tag-pills-container {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 10px 0;
+    scrollbar-width: none;
+}
+
+.tag-pill {
+    white-space: nowrap;
+    background: #252525;
+    color: #888;
+    padding: 6px 15px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border: 1px solid #333;
+}
+
+.tag-pill.active {
+    background: var(--accent);
+    color: black;
+    border-color: var(--accent);
+    font-weight: bold;
+}
+
+.book-tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.book-tag-badge {
+    background: var(--accent);
+    color: black;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    height: 32px;
+    box-sizing: border-box;
+}
+
+.remove-tag-btn {
+    background: none;
+    border: none;
+    color: rgba(0, 0, 0, 0.5);
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: color 0.2s;
+}
+
+.remove-tag-btn:hover {
+    color: rgba(0, 0, 0, 0.8);
+}
+
+.add-tag-btn {
+    background: #2d2d2d;
+    border: 1px solid #444;
+    color: #999;
+    padding: 0 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    height: 32px;
+    box-sizing: border-box;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.add-tag-btn:hover {
+    border-color: #666;
+    color: #ccc;
+    background: #333;
+}
+
 .close-btn svg {
     width: 20px !important;
     height: 20px !important;
@@ -474,6 +589,12 @@ body {
     max-width: 500px !important;
 }
 
+.settings-modal .modal-body {
+    flex-direction: column;
+    padding: 20px 30px;
+    gap: 0;
+}
+
 .modal-header {
     padding: 20px 30px;
     border-bottom: 1px solid #333;
@@ -511,34 +632,54 @@ body {
     flex: 1;
 }
 
-.add-library {
+.add-item {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid #333;
+    align-items: stretch;
 }
 
-.add-library input {
+.add-item input {
     flex: 1;
-    background: #1e1e1e;
+    background: rgba(255, 255, 255, 0.03);
     border: 1px solid #333;
     color: white;
-    padding: 10px;
-    border-radius: 6px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+
+.add-item input:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: rgba(187, 134, 252, 0.05);
+    box-shadow: 0 0 10px rgba(187, 134, 252, 0.1);
 }
 
 .add-btn {
     background: var(--accent);
     color: #121212;
     border: none;
-    padding: 0 15px;
-    border-radius: 6px;
-    font-weight: bold;
+    padding: 0 24px;
+    border-radius: 10px;
+    font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.add-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(187, 134, 252, 0.3);
+    filter: brightness(1.1);
+}
+
+.add-btn:active {
+    transform: translateY(0);
 }
 
 .icon-btn {

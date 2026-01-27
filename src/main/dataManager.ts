@@ -17,6 +17,7 @@ export interface Book {
     location?: string
     status?: 'reading' | 'read' | 'borrowed' | 'available'
     notes?: string
+    tags?: string[]
 }
 
 export interface Library {
@@ -27,6 +28,7 @@ export interface Library {
 export interface Config {
     libraries: Library[]
     activeLibraryId: string
+    tags: string[]
 }
 
 const DB_PATH = 'db_biblion'
@@ -38,6 +40,10 @@ const COVERS_DIR = path.join(DB_PATH, 'covers')
 export class DataManager {
     constructor() {
         this.ensureDbStructure()
+    }
+
+    private normalizeIsbn(isbn: string): string {
+        return isbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
     }
 
     private ensureDbStructure() {
@@ -52,7 +58,8 @@ export class DataManager {
         if (!fs.existsSync(CONFIG_FILE)) {
             const defaultConfig: Config = {
                 libraries: [{ id: 'default', name: 'Principal' }],
-                activeLibraryId: 'default'
+                activeLibraryId: 'default',
+                tags: []
             }
             fs.writeJsonSync(CONFIG_FILE, defaultConfig)
         }
@@ -60,9 +67,11 @@ export class DataManager {
 
     public getConfig(): Config {
         try {
-            return fs.readJsonSync(CONFIG_FILE)
+            const config = fs.readJsonSync(CONFIG_FILE)
+            if (!config.tags) config.tags = []
+            return config
         } catch (e) {
-            return { libraries: [{ id: 'default', name: 'Principal' }], activeLibraryId: 'default' }
+            return { libraries: [{ id: 'default', name: 'Principal' }], activeLibraryId: 'default', tags: [] }
         }
     }
 
@@ -81,24 +90,40 @@ export class DataManager {
 
     public saveBook(book: Book) {
         const books = this.getAllBooks()
-        const config = this.getConfig()
-        const index = books.findIndex(b => b.isbn === book.isbn)
+        const normalizedIsbn = this.normalizeIsbn(book.isbn)
+        const index = books.findIndex(b => this.normalizeIsbn(b.isbn) === normalizedIsbn)
+
+        console.log(`[DataManager] Saving book: "${book.title}" (ISBN: ${book.isbn}, Normalized: ${normalizedIsbn})`)
+        console.log(`[DataManager] Existing index: ${index}`)
 
         // Create Backup
         this.createBackup(books)
 
         if (index >= 0) {
             // Update
-            books[index] = { ...books[index], ...book, updatedAt: new Date().toISOString() }
+            const existingBook = books[index]
+            console.log(`[DataManager] Updating existing book in library: ${existingBook.libraryId}`)
+            books[index] = {
+                ...existingBook,
+                ...book,
+                libraryId: book.libraryId !== undefined ? book.libraryId : existingBook.libraryId,
+                tags: book.tags !== undefined ? book.tags : existingBook.tags,
+                createdAt: existingBook.createdAt,
+                isbn: existingBook.isbn,
+                updatedAt: new Date().toISOString()
+            }
         } else {
             // New
-            book.createdAt = new Date().toISOString()
-            book.updatedAt = book.createdAt
-            // Assign active library if not set
-            if (!book.libraryId) {
-                book.libraryId = config.activeLibraryId
-            }
-            books.push(book)
+            console.log(`[DataManager] Creating new book as UNASSIGNED`)
+            const newBook = { ...book }
+            newBook.isbn = normalizedIsbn // Store normalized
+            newBook.createdAt = new Date().toISOString()
+            newBook.updatedAt = newBook.createdAt
+
+            // CRITICAL: New books always go to "unassigned" regardless of active library
+            newBook.libraryId = ""
+
+            books.push(newBook)
         }
 
         fs.writeJsonSync(DB_FILE, books, { spaces: 2 })
@@ -106,13 +131,21 @@ export class DataManager {
 
     public deleteBook(isbn: string) {
         const books = this.getAllBooks()
-        const filteredBooks = books.filter(b => b.isbn !== isbn)
+        const targetIsbn = this.normalizeIsbn(isbn)
+        console.log(`[DataManager] Deleting book: ${isbn} (Normalized: ${targetIsbn})`)
+
+        const filteredBooks = books.filter(b => {
+            const normalized = this.normalizeIsbn(b.isbn)
+            return normalized !== targetIsbn
+        })
 
         if (filteredBooks.length !== books.length) {
+            console.log(`[DataManager] Deleted successfully. New count: ${filteredBooks.length}`)
             this.createBackup(books)
             fs.writeJsonSync(DB_FILE, filteredBooks, { spaces: 2 })
             return true
         }
+        console.warn(`[DataManager] Delete FAILED: ISBN not found among ${books.length} books.`)
         return false
     }
 
@@ -123,15 +156,24 @@ export class DataManager {
 
         let changed = false
         booksToSave.forEach(book => {
-            const index = books.findIndex(b => b.isbn === book.isbn)
+            const normalizedIsbn = this.normalizeIsbn(book.isbn)
+            const index = books.findIndex(b => this.normalizeIsbn(b.isbn) === normalizedIsbn)
             if (index >= 0) {
-                books[index] = { ...books[index], ...book, updatedAt: new Date().toISOString() }
+                // Update: preserve library and tags if not explicitly provided in the update
+                const existing = books[index]
+                books[index] = {
+                    ...existing,
+                    ...book,
+                    libraryId: book.libraryId !== undefined ? book.libraryId : existing.libraryId,
+                    tags: book.tags !== undefined ? book.tags : existing.tags,
+                    updatedAt: new Date().toISOString()
+                }
                 changed = true
             } else {
-                // Determine if we should really create new books in bulk save? Assuming yes.
-                book.createdAt = new Date().toISOString()
-                book.updatedAt = book.createdAt
-                books.push(book)
+                const newBook = { ...book, isbn: normalizedIsbn, libraryId: "" }
+                newBook.createdAt = new Date().toISOString()
+                newBook.updatedAt = newBook.createdAt
+                books.push(newBook)
                 changed = true
             }
         })
@@ -144,7 +186,8 @@ export class DataManager {
 
     public deleteBooks(isbns: string[]) {
         const books = this.getAllBooks()
-        const filteredBooks = books.filter(b => !isbns.includes(b.isbn))
+        const targetIsbns = isbns.map(id => this.normalizeIsbn(id))
+        const filteredBooks = books.filter(b => !targetIsbns.includes(this.normalizeIsbn(b.isbn)))
 
         if (filteredBooks.length !== books.length) {
             this.createBackup(books)

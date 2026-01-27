@@ -16,7 +16,8 @@ interface Book {
     description?: string
     coverPath?: string
     pageCount?: number
-    libraryId: string
+    libraryId?: string
+    tags?: string[]
 }
 
 interface Library {
@@ -27,6 +28,7 @@ interface Library {
 interface Config {
     libraries: Library[]
     activeLibraryId: string
+    tags: string[]
 }
 
 function App() {
@@ -44,6 +46,7 @@ function App() {
         (localStorage.getItem('thumbSize') as any) || 'L'
     )
     const [searchQuery, setSearchQuery] = useState('')
+    const [selectedTag, setSelectedTag] = useState<string | null>(null)
     const menuRef = useRef<HTMLDivElement>(null)
 
     const THUMB_SIZES = {
@@ -62,6 +65,12 @@ function App() {
         // Listen for updates
         window.electron.onUpdate((_event: any, updatedBooks: Book[]) => {
             setBooks(updatedBooks)
+            // Update selectedBook if it's currently open to reflect latest DB changes
+            setSelectedBook(prev => {
+                if (!prev) return null
+                const updated = updatedBooks.find(b => b.isbn === prev.isbn)
+                return updated || null
+            })
         })
 
         window.electron.onConfigUpdate((_event: any, updatedConfig: Config) => {
@@ -102,8 +111,13 @@ function App() {
             })
         }
 
+        // 3. Filter by tag
+        if (selectedTag) {
+            result = result.filter(b => b.tags?.includes(selectedTag))
+        }
+
         setFilteredBooks(result)
-    }, [books, config, searchQuery])
+    }, [books, config, searchQuery, selectedTag])
 
     const normalizeText = (text: string) => {
         return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
@@ -127,9 +141,9 @@ function App() {
         window.electron.saveConfig(newConfig).then(setConfig)
     }
 
-    const handleSaveLibraries = (libs: Library[]) => {
+    const handleSaveLibraries = (libs: Library[], tags: string[]) => {
         if (!config) return
-        const newConfig = { ...config, libraries: libs }
+        const newConfig = { ...config, libraries: libs, tags: tags }
         // If active library was deleted, fallback to default
         if (!libs.find(l => l.id === newConfig.activeLibraryId)) {
             newConfig.activeLibraryId = 'default'
@@ -244,6 +258,25 @@ function App() {
         setSelectedBook(updatedBook)
     }
 
+    const handleAddTagToBook = async (tagName: string) => {
+        if (!selectedBook) return
+        const currentTags = selectedBook.tags || []
+        if (currentTags.includes(tagName)) return
+        const updatedBook = { ...selectedBook, tags: [...currentTags, tagName] }
+        const updatedBooks = await window.electron.saveBook(updatedBook)
+        setBooks(updatedBooks)
+        setSelectedBook(updatedBook)
+    }
+
+    const handleRemoveTagFromBook = async (tagName: string) => {
+        if (!selectedBook) return
+        const currentTags = selectedBook.tags || []
+        const updatedBook = { ...selectedBook, tags: currentTags.filter(t => t !== tagName) }
+        const updatedBooks = await window.electron.saveBook(updatedBook)
+        setBooks(updatedBooks)
+        setSelectedBook(updatedBook)
+    }
+
     return (
         <div className="container">
             <header className="app-header">
@@ -263,8 +296,8 @@ function App() {
                                     value={config.activeLibraryId || ''}
                                     onChange={(e) => handleSwitchLibrary(e.target.value)}
                                 >
-                                    <option value="">Todas las bibliotecas</option>
-                                    <option value="unassigned">Sin asignar</option>
+                                    <option value="">Todas las Bibliotecas</option>
+                                    <option value="unassigned">(Sin Asignar)</option>
                                     {config.libraries.map(l => (
                                         <option key={l.id} value={l.id}>{l.name}</option>
                                     ))}
@@ -298,13 +331,13 @@ function App() {
 
                             {menuOpen && (
                                 <div className="settings-menu">
-                                    <div className="menu-item" onClick={handleExport}>
-                                        <Download size={18} />
-                                        <span>Exportar Backup (JSON)</span>
-                                    </div>
                                     <div className="menu-item" onClick={() => { setMenuOpen(false); setSettingsOpen(true); }}>
                                         <Settings size={18} />
                                         <span>Configuración</span>
+                                    </div>
+                                    <div className="menu-item" onClick={handleExport}>
+                                        <Download size={18} />
+                                        <span>Exportar Backup (JSON)</span>
                                     </div>
                                 </div>
                             )}
@@ -319,6 +352,26 @@ function App() {
                     thumbnailSize={thumbnailSize}
                     setThumbnailSize={setThumbnailSize}
                 />
+
+                {config && config.tags.length > 0 && (
+                    <div className="tag-pills-container">
+                        <div
+                            className={`tag-pill ${selectedTag === null ? 'active' : ''}`}
+                            onClick={() => setSelectedTag(null)}
+                        >
+                            Todos
+                        </div>
+                        {config.tags.map(tag => (
+                            <div
+                                key={tag}
+                                className={`tag-pill ${selectedTag === tag ? 'active' : ''}`}
+                                onClick={() => setSelectedTag(tag)}
+                            >
+                                {tag}
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 <div className="book-list">
                     {filteredBooks.map(book => (
@@ -400,7 +453,7 @@ function App() {
                                             <div className="modal-library-move" style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                 <strong>Biblioteca:</strong>
                                                 <select
-                                                    value={selectedBook.libraryId || 'default'}
+                                                    value={selectedBook.libraryId || ""}
                                                     onChange={(e) => handleMoveLibrary(e.target.value)}
                                                     style={{
                                                         background: '#333',
@@ -410,9 +463,12 @@ function App() {
                                                         borderRadius: '4px',
                                                         padding: '5px 10px',
                                                         cursor: 'pointer',
-                                                        fontSize: '0.9rem'
+                                                        fontSize: '0.9rem',
+                                                        width: '100%',
+                                                        maxWidth: '200px'
                                                     }}
                                                 >
+                                                    <option value="">(Sin Asignar)</option>
                                                     {config?.libraries.map(l => (
                                                         <option key={l.id} value={l.id}>{l.name}</option>
                                                     ))}
@@ -427,6 +483,39 @@ function App() {
                                         ) : (
                                             <p className="modal-desc"><em>Sin resumen disponible.</em></p>
                                         )}
+
+                                        <div className="book-tags-section" style={{ marginTop: '15px' }}>
+                                            <h4>Etiquetas:</h4>
+                                            <div className="book-tags-list">
+                                                {selectedBook.tags?.map(tag => (
+                                                    <span key={tag} className="book-tag-badge">
+                                                        {tag}
+                                                        <button className="remove-tag-btn" onClick={() => handleRemoveTagFromBook(tag)}>
+                                                            <X size={12} />
+                                                        </button>
+                                                    </span>
+                                                ))}
+                                                {config?.tags.filter(t => !selectedBook.tags?.includes(t)).length! > 0 && (
+                                                    <select
+                                                        className="add-tag-btn"
+                                                        value=""
+                                                        onChange={(e) => {
+                                                            handleAddTagToBook(e.target.value)
+                                                            e.target.value = ""
+                                                        }}
+                                                    >
+                                                        <option value="" disabled>+ Agregar etiqueta</option>
+                                                        {config?.tags
+                                                            .filter(t => !selectedBook.tags?.includes(t))
+                                                            .map(tag => <option key={tag} value={tag}>{tag}</option>)
+                                                        }
+                                                    </select>
+                                                )}
+                                                {config?.tags.length === 0 && (
+                                                    <small style={{ color: '#666' }}>No hay etiquetas definidas en configuración.</small>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #333' }}>
@@ -469,6 +558,7 @@ function App() {
                 settingsOpen && config && (
                     <SettingsModal
                         libraries={config.libraries}
+                        tags={config.tags}
                         onClose={() => setSettingsOpen(false)}
                         onSave={handleSaveLibraries}
                     />
