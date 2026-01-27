@@ -9,12 +9,22 @@ interface Book {
 
 interface Props {
     book: Book
+    isSelectionMode: boolean
+    isSelected: boolean
+    onToggleSelection: (e: React.MouseEvent) => void
 }
 
-export const BookListItem: React.FC<Props> = ({ book }) => {
+export const BookListItem: React.FC<Props> = ({ book, isSelectionMode, isSelected, onToggleSelection }) => {
     return (
-        <div className="book-item">
+        <div className={`book-item ${isSelected ? 'selected' : ''}`}>
             <div className="book-cover">
+                {isSelectionMode && (
+                    <div className="selection-overlay" onClick={onToggleSelection}>
+                        <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}>
+                            {isSelected && <span className="check-icon">✓</span>}
+                        </div>
+                    </div>
+                )}
                 {book.coverPath ? (
                     <img
                         src={book.coverPath.startsWith('http') ? book.coverPath : `file://${book.coverPath}`}

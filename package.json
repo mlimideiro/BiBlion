@@ -1,6 +1,6 @@
 {
-  "name": "biblioteka",
-  "productName": "Biblioteka",
+  "name": "biblion",
+  "productName": "BiBlion",
   "version": "1.0.0",
   "description": "Biblioteca personal con escaneo de ISBN desde el celular",
   "main": "dist/main/main.js",

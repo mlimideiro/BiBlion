@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { BookListItem } from './components/BookListItem'
 import { SearchBar } from './components/SearchBar'
-import { Settings, Download, X, Sparkles, LayoutGrid } from 'lucide-react'
+import { Settings, Download, X, Sparkles, LayoutGrid, Trash2 } from 'lucide-react'
 import { SettingsModal } from './components/SettingsModal'
 import './index.css'
 import './components/components.css'
@@ -36,6 +36,9 @@ function App() {
 
     const [menuOpen, setMenuOpen] = useState(false)
     const [settingsOpen, setSettingsOpen] = useState(false)
+    const [isSelectionMode, setIsSelectionMode] = useState(false)
+    const [selectedIsbns, setSelectedIsbns] = useState<string[]>([])
+    const [searchQuery, setSearchQuery] = useState('')
     const menuRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -64,38 +67,38 @@ function App() {
     }, [])
 
     useEffect(() => {
-        if (!config) {
-            setFilteredBooks(books)
-            return
+        let result = books
+
+        // 1. Filter by active library
+        if (config && config.activeLibraryId) {
+            if (config.activeLibraryId === 'unassigned') {
+                result = result.filter(b => !b.libraryId || b.libraryId === "")
+            } else {
+                result = result.filter(b => b.libraryId === config.activeLibraryId)
+            }
         }
-        // Filter by active library
-        const libraryBooks = books.filter(b => b.libraryId === config.activeLibraryId || !b.libraryId)
-        setFilteredBooks(libraryBooks)
-    }, [books, config])
+
+        // 2. Filter by search query
+        if (searchQuery) {
+            const normalizedQuery = normalizeText(searchQuery)
+            result = result.filter(b => {
+                const title = normalizeText(b.title)
+                const authors = b.authors.map(a => normalizeText(a))
+                return title.includes(normalizedQuery) ||
+                    authors.some(a => a.includes(normalizedQuery)) ||
+                    b.isbn.includes(searchQuery)
+            })
+        }
+
+        setFilteredBooks(result)
+    }, [books, config, searchQuery])
 
     const normalizeText = (text: string) => {
         return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
     }
 
     const handleSearch = (query: string) => {
-        if (!config) return
-
-        const libraryBooks = books.filter(b => b.libraryId === config.activeLibraryId || !b.libraryId)
-
-        if (!query) {
-            setFilteredBooks(libraryBooks)
-            return
-        }
-
-        const normalizedQuery = normalizeText(query)
-        const result = libraryBooks.filter(b => {
-            const title = normalizeText(b.title)
-            const authors = b.authors.map(a => normalizeText(a))
-            return title.includes(normalizedQuery) ||
-                authors.some(a => a.includes(normalizedQuery)) ||
-                b.isbn.includes(query)
-        })
-        setFilteredBooks(result)
+        setSearchQuery(query)
     }
 
     const handleSwitchLibrary = (id: string) => {
@@ -121,7 +124,7 @@ function App() {
         const url = URL.createObjectURL(dataBlob)
         const link = document.createElement('a')
         link.href = url
-        link.download = `biblioteka_backup_${new Date().toISOString().split('T')[0]}.json`
+        link.download = `biblion_backup_${new Date().toISOString().split('T')[0]}.json`
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
@@ -130,6 +133,50 @@ function App() {
     }
 
     const mobileUrl = serverInfo ? `http://${serverInfo.ip}:${serverInfo.port}` : 'Cargando...'
+
+    const toggleSelectionMode = () => {
+        setIsSelectionMode(!isSelectionMode)
+        setSelectedIsbns([])
+    }
+
+    const toggleBookSelection = (isbn: string) => {
+        if (selectedIsbns.includes(isbn)) {
+            setSelectedIsbns(selectedIsbns.filter(id => id !== isbn))
+        } else {
+            setSelectedIsbns([...selectedIsbns, isbn])
+        }
+    }
+
+    const handleBulkDelete = async () => {
+        if (selectedIsbns.length === 0) return
+        if (confirm(`¿Estás seguro de eliminar ${selectedIsbns.length} libros?`)) {
+            try {
+                const updatedBooks = await window.electron.bulkDeleteBooks(selectedIsbns)
+                setBooks(updatedBooks)
+                setSelectedIsbns([])
+                setIsSelectionMode(false)
+            } catch (e) {
+                alert("Error en la eliminación masiva")
+            }
+        }
+    }
+
+    const handleBulkMove = async (libraryId: string) => {
+        if (selectedIsbns.length === 0) return
+        try {
+            const booksToUpdate = books
+                .filter(b => selectedIsbns.includes(b.isbn))
+                .map(b => ({ ...b, libraryId }))
+
+            const updatedBooks = await window.electron.bulkSaveBooks(booksToUpdate)
+            setBooks(updatedBooks)
+            setSelectedIsbns([])
+            setIsSelectionMode(false)
+            alert("Libros movidos con éxito")
+        } catch (e) {
+            alert("Error al mover los libros")
+        }
+    }
 
     const [selectedBook, setSelectedBook] = useState<Book | null>(null)
     const [repairing, setRepairing] = useState(false)
@@ -180,50 +227,68 @@ function App() {
     return (
         <div className="container">
             <header className="app-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <img src={logo} alt="Logo" style={{ width: 55, height: 55, borderRadius: 10 }} />
-                        <h1 style={{ fontSize: '2.5rem' }}>BiBlion</h1>
+                <div className="header-top">
+                    <div className="brand">
+                        <img src={logo} alt="Logo" style={{ width: 45, height: 45, borderRadius: 8 }} />
+                        <h1>BiBlion</h1>
                     </div>
-
-                    {config && (
-                        <div className="library-selector">
-                            <LayoutGrid size={18} />
-                            <select
-                                value={config.activeLibraryId}
-                                onChange={(e) => handleSwitchLibrary(e.target.value)}
-                            >
-                                {config.libraries.map(l => (
-                                    <option key={l.id} value={l.id}>{l.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <div className="server-info">
-                        <span>📱 Escanea desde: </span>
-                        <a href={mobileUrl} target="_blank" className="mobile-link">{mobileUrl}</a>
-                    </div>
-
-                    <div className="settings-container" ref={menuRef}>
-                        <button className={`settings-btn ${menuOpen ? 'active' : ''}`} onClick={() => setMenuOpen(!menuOpen)}>
-                            <Settings size={28} />
-                        </button>
-
-                        {menuOpen && (
-                            <div className="settings-menu">
-                                <div className="menu-item" onClick={() => { setSettingsOpen(true); setMenuOpen(false); }}>
-                                    <Settings size={18} />
-                                    <span>Configuración</span>
-                                </div>
-                                <div className="menu-item" onClick={handleExport}>
-                                    <Download size={18} />
-                                    <span>Exportar (JSON)</span>
-                                </div>
+                <div className="header-controls">
+                    <div className="controls-group">
+                        {config && (
+                            <div className="library-selector">
+                                <LayoutGrid size={16} />
+                                <select
+                                    value={config.activeLibraryId || ''}
+                                    onChange={(e) => handleSwitchLibrary(e.target.value)}
+                                >
+                                    <option value="">Todas las bibliotecas</option>
+                                    <option value="unassigned">⚠️ Sin asignar</option>
+                                    {config.libraries.map(l => (
+                                        <option key={l.id} value={l.id}>{l.name}</option>
+                                    ))}
+                                </select>
                             </div>
                         )}
+
+                        <button
+                            className={`select-mode-btn ${isSelectionMode ? 'active' : ''}`}
+                            onClick={toggleSelectionMode}
+                            title="Modo Selección"
+                        >
+                            {isSelectionMode ? <X size={16} /> : <LayoutGrid size={16} />}
+                            <span>{isSelectionMode ? 'Cancelar' : 'Seleccionar'}</span>
+                        </button>
+                    </div>
+
+                    <div className="controls-group right">
+                        <div className="server-info">
+                            <span style={{ marginRight: 8 }}>📲</span>
+                            Escanea desde: <a href={mobileUrl} target="_blank" className="mobile-link">{mobileUrl}</a>
+                        </div>
+
+                        <div className="settings-container" ref={menuRef}>
+                            <button
+                                className={`settings-btn ${menuOpen ? 'active' : ''}`}
+                                onClick={() => setMenuOpen(!menuOpen)}
+                            >
+                                <Settings size={22} />
+                            </button>
+
+                            {menuOpen && (
+                                <div className="settings-menu">
+                                    <div className="menu-item" onClick={handleExport}>
+                                        <Download size={18} />
+                                        <span>Exportar Backup (JSON)</span>
+                                    </div>
+                                    <div className="menu-item" onClick={() => { setMenuOpen(false); setSettingsOpen(true); }}>
+                                        <Settings size={18} />
+                                        <span>Configuración</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </header>
@@ -233,8 +298,20 @@ function App() {
 
                 <div className="book-list">
                     {filteredBooks.map(book => (
-                        <div key={book.isbn} onClick={() => setSelectedBook(book)} style={{ cursor: 'pointer' }}>
-                            <BookListItem book={book} />
+                        <div
+                            key={book.isbn}
+                            onClick={() => isSelectionMode ? toggleBookSelection(book.isbn) : setSelectedBook(book)}
+                            style={{ cursor: 'pointer' }}
+                        >
+                            <BookListItem
+                                book={book}
+                                isSelectionMode={isSelectionMode}
+                                isSelected={selectedIsbns.includes(book.isbn)}
+                                onToggleSelection={(e) => {
+                                    e.stopPropagation()
+                                    toggleBookSelection(book.isbn)
+                                }}
+                            />
                         </div>
                     ))}
                     {filteredBooks.length === 0 && (
@@ -246,6 +323,32 @@ function App() {
                 </div>
             </div>
 
+            {isSelectionMode && selectedIsbns.length > 0 && (
+                <div className="bulk-action-bar">
+                    <div className="bulk-info">
+                        {selectedIsbns.length} seleccionados
+                    </div>
+                    <div className="bulk-actions">
+                        <select
+                            className="action-btn"
+                            onChange={(e) => {
+                                handleBulkMove(e.target.value)
+                                e.target.value = ""
+                            }}
+                            defaultValue=""
+                        >
+                            <option value="" disabled>Mover a...</option>
+                            {config?.libraries.map(l => (
+                                <option key={l.id} value={l.id}>{l.name}</option>
+                            ))}
+                        </select>
+                        <button className="action-btn danger delete-btn" onClick={handleBulkDelete}>
+                            <Trash2 size={18} />
+                            <span>Eliminar</span>
+                        </button>
+                    </div>
+                </div>
+            )}
             {selectedBook && (
                 <div className="modal-overlay" onClick={() => setSelectedBook(null)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>

@@ -47,6 +47,14 @@ app.whenReady().then(() => {
         dataManager.deleteBook(isbn)
         return dataManager.getAllBooks()
     })
+    ipcMain.handle('bulk-save-books', (_event, books) => {
+        dataManager.saveBooks(books)
+        return dataManager.getAllBooks()
+    })
+    ipcMain.handle('bulk-delete-books', (_event, isbns) => {
+        dataManager.deleteBooks(isbns)
+        return dataManager.getAllBooks()
+    })
     ipcMain.handle('get-server-info', () => serverInfo)
 
     // Library & Config Handlers

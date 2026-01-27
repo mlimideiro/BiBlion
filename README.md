@@ -1,4 +1,4 @@
-# Biblioteka
+# BiBlion
 
 Aplicación de escritorio para gestión de biblioteca personal con escáner móvil integrado.
 
@@ -29,7 +29,7 @@ En la parte superior de la aplicación verás la URL para conectar tu celular (e
 
 ## Estructura de Datos
 
-Los datos se guardan automáticamente en la carpeta `db_biblioteka` en la raíz del proyecto.
+Los datos se guardan automáticamente en la carpeta `db_biblion` en la raíz del proyecto.
 - `books.json`: Base de datos de libros.
 - `covers/`: Imágenes de portada (pendiente de implementación completa de descarga).
 - `backups/`: Copias de seguridad automáticas.

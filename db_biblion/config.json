@@ -1,0 +1,13 @@
+{
+  "libraries": [
+    {
+      "id": "default",
+      "name": "Biblio Grande"
+    },
+    {
+      "id": "1769470701100",
+      "name": "Biblio Chica"
+    }
+  ],
+  "activeLibraryId": "1769470701100"
+}

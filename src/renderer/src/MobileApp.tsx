@@ -6,21 +6,26 @@ import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-im
 import 'react-image-crop/dist/ReactCrop.css'
 
 interface BookMetadata {
+    isbn: string
     title: string
     authors: string[]
     publisher?: string
     pageCount?: number
     description?: string
     coverUrl?: string
+    status: 'loading' | 'ready' | 'error'
 }
 
 function MobileApp() {
     const [mode, setMode] = useState<'idle' | 'scanning' | 'cropping' | 'processing' | 'result'>('idle')
+    const [isBurstMode, setIsBurstMode] = useState(false)
     const [log, setLog] = useState<string[]>(['Listo.'])
-    const [bookData, setBookData] = useState<BookMetadata | null>(null)
-    const [scannedIsbn, setScannedIsbn] = useState<string | null>(null)
+    const [pendingBooks, setPendingBooks] = useState<BookMetadata[]>([])
     const [manualIsbn, setManualIsbn] = useState('')
     const scannerRef = useRef<Html5Qrcode | null>(null)
+    const lastScannedIsbn = useRef<string | null>(null)
+    const scanTimeout = useRef<any>(null)
+    const sessionIsbns = useRef<Set<string>>(new Set())
 
     // Cropping states
     const [imgSrc, setImgSrc] = useState('')
@@ -30,7 +35,8 @@ function MobileApp() {
 
     const addLog = (msg: string) => setLog(prev => [...prev.slice(-4), msg])
 
-    const startScanner = async () => {
+    const startScanner = async (burst: boolean) => {
+        setIsBurstMode(burst)
         setMode('scanning')
         addLog('Iniciando cámara...')
 
@@ -59,17 +65,29 @@ function MobileApp() {
                 (decodedText) => {
                     const cleanIsbn = decodedText.replace(/-/g, '')
                     if (cleanIsbn.length === 10 || cleanIsbn.length === 13) {
+                        // Prevent repetitive scans of the same ISBN too quickly
+                        if (cleanIsbn === lastScannedIsbn.current) return
+
+                        lastScannedIsbn.current = cleanIsbn
+                        if (scanTimeout.current) clearTimeout(scanTimeout.current)
+                        scanTimeout.current = setTimeout(() => { lastScannedIsbn.current = null }, 3000)
+
                         addLog(`¡Leído! ${cleanIsbn}`)
-                        scanner.stop().then(() => {
-                            scanner.clear()
-                            setScannedIsbn(cleanIsbn)
-                            handleLookup(cleanIsbn)
-                        }).catch(console.error)
+
+                        if (!burst) {
+                            scanner.stop().then(() => {
+                                scanner.clear()
+                                handleLookup(cleanIsbn, burst)
+                            }).catch(console.error)
+                        } else {
+                            // In Burst Mode, just add to queue and keep scanning
+                            handleLookup(cleanIsbn, burst)
+                        }
                     }
                 },
                 (_errorMessage) => { }
             )
-            addLog('Cámara activa. Apunta al código de barras.')
+            addLog(burst ? 'Modo Ráfaga activo. Escanea varios libros.' : 'Cámara activa. Apunta al código de barras.')
         } catch (err: any) {
             addLog('Error cámara: ' + err.message)
             setMode('idle')
@@ -105,8 +123,8 @@ function MobileApp() {
             width,
             height,
         )
-        // Adjust the crop to be free-form after creation if makeAspectCrop locked it
-        setCrop({ ...initialCrop, aspect: undefined })
+        // Adjust the crop to be free-form after creation
+        setCrop(initialCrop)
     }
 
     const handleCropComplete = async () => {
@@ -165,8 +183,7 @@ function MobileApp() {
 
                 if (foundIsbn) {
                     addLog(`Detectado: ${foundIsbn}`)
-                    setScannedIsbn(foundIsbn)
-                    handleLookup(foundIsbn)
+                    handleLookup(foundIsbn, false)
                 } else {
                     addLog('No se encontró un ISBN válido en el recorte.')
                     setMode('idle')
@@ -184,37 +201,78 @@ function MobileApp() {
             addLog('ISBN muy corto.')
             return
         }
-        setScannedIsbn(clean)
-        handleLookup(clean)
+        handleLookup(clean, isBurstMode)
     }
 
-    const handleLookup = async (isbn: string) => {
-        setMode('processing')
+    const handleLookup = async (isbn: string, isBurst: boolean) => {
+        if (!isBurst) {
+            setMode('processing')
+        }
+
+        if (sessionIsbns.current.has(isbn)) {
+            addLog(`Ya procesando ${isbn}`)
+            return
+        }
+
+        sessionIsbns.current.add(isbn)
+
+        const newPending: BookMetadata = {
+            isbn,
+            title: 'Buscando...',
+            authors: [],
+            status: 'loading'
+        }
+
+        setPendingBooks(prev => [newPending, ...prev])
         addLog(`Buscando ${isbn}...`)
+
         try {
             const res = await axios.get(`/api/lookup/${isbn}`)
-            setBookData(res.data)
-            setMode('result')
+            setPendingBooks(prev => prev.map(b =>
+                b.isbn === isbn ? { ...res.data, isbn, status: 'ready' } : b
+            ))
+
+            if (!isBurst) {
+                setMode('result')
+            }
         } catch (err) {
-            addLog('No encontrado o error de red.')
-            setMode('idle')
+            addLog(`Error en ${isbn}`)
+            setPendingBooks(prev => prev.map(b =>
+                b.isbn === isbn ? { ...b, title: 'No encontrado', status: 'error' } : b
+            ))
+            if (!isBurst) {
+                setMode('idle')
+            }
         }
     }
 
+    const removeItem = (isbn: string) => {
+        setPendingBooks(prev => prev.filter(b => b.isbn !== isbn))
+        // We don't remove from sessionIsbns to avoid re-scanning the same mistake immediately 
+        // until the app is reset or the user stops/starts
+    }
+
     const handleConfirm = async () => {
-        if (!bookData || !scannedIsbn) return
-        addLog('Guardando...')
+        const readyBooks = pendingBooks.filter(b => b.status === 'ready')
+        if (readyBooks.length === 0) return
+
+        addLog(`Guardando ${readyBooks.length} libros...`)
+        setMode('processing')
+
         try {
-            await axios.post('/api/save', { isbn: scannedIsbn, ...bookData })
-            addLog('¡Guardado!')
+            for (const book of readyBooks) {
+                await axios.post('/api/save', book)
+            }
+            addLog('¡Todo guardado!')
             setTimeout(() => {
-                setBookData(null)
-                setScannedIsbn(null)
+                setPendingBooks([])
+                sessionIsbns.current.clear() // Clear for a fresh new scan session
                 setManualIsbn('')
                 setMode('idle')
             }, 2000)
         } catch (err) {
-            addLog('Falló el guardado.')
+            addLog('Falló el guardado masivo.')
+            setMode('result')
         }
     }
 
@@ -228,11 +286,18 @@ function MobileApp() {
 
             {mode === 'idle' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-                    <button
-                        onClick={startScanner}
-                        style={{ padding: 20, fontSize: '1.2rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 12, fontWeight: 'bold' }}>
-                        📷 Escanear Código
-                    </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <button
+                            onClick={() => startScanner(false)}
+                            style={{ padding: 20, fontSize: '1.1rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 12, fontWeight: 'bold' }}>
+                            📷 Uno solo
+                        </button>
+                        <button
+                            onClick={() => startScanner(true)}
+                            style={{ padding: 20, fontSize: '1.1rem', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 12, fontWeight: 'bold' }}>
+                            🚀 Ráfaga
+                        </button>
+                    </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                         <label style={{
@@ -296,9 +361,37 @@ function MobileApp() {
             {mode === 'scanning' && (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <div id="reader" style={{ width: '100%', background: '#000', borderRadius: 8, overflow: 'hidden', flex: 1 }}></div>
-                    <button onClick={(() => setMode('idle'))} style={{ marginTop: 15, padding: 15, background: '#ef4444', color: 'white', border: 'none', borderRadius: 8 }}>
-                        Detener
-                    </button>
+
+                    {isBurstMode && pendingBooks.length > 0 && (
+                        <div style={{ marginTop: 10, maxHeight: 150, overflowY: 'auto', background: '#222', borderRadius: 8, padding: 5 }}>
+                            {pendingBooks.map(b => (
+                                <div key={b.isbn} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 10px', borderBottom: '1px solid #333', fontSize: '0.8rem' }}>
+                                    <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {b.status === 'loading' ? '⌛' : '✅'} {b.title}
+                                    </span>
+                                    <button onClick={() => removeItem(b.isbn)} style={{ background: 'none', border: 'none', color: '#ff4444' }}>✕</button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: 10, marginTop: 15 }}>
+                        {isBurstMode && pendingBooks.length > 0 && (
+                            <button
+                                onClick={() => {
+                                    if (scannerRef.current) scannerRef.current.stop().then(() => setMode('result'))
+                                }}
+                                style={{ flex: 1, padding: 15, background: '#22c55e', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold' }}>
+                                Revisar ({pendingBooks.length})
+                            </button>
+                        )}
+                        <button onClick={(() => {
+                            if (scannerRef.current) scannerRef.current.stop().then(() => setMode('idle'))
+                            else setMode('idle')
+                        })} style={{ flex: 1, padding: 15, background: '#ef4444', color: 'white', border: 'none', borderRadius: 8 }}>
+                            Detener
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -309,22 +402,37 @@ function MobileApp() {
                 </div>
             )}
 
-            {mode === 'result' && bookData && (
-                <div style={{ background: '#333', padding: 20, borderRadius: 12, flex: 1 }}>
-                    {bookData.coverUrl && <img src={bookData.coverUrl} style={{ width: 120, borderRadius: 5, display: 'block', margin: '0 auto 15px' }} />}
-                    <h2 style={{ fontSize: '1.2rem', marginBottom: 5, textAlign: 'center' }}>{bookData.title}</h2>
-                    <p style={{ color: '#bbb', textAlign: 'center', marginBottom: 15 }}>{bookData.authors.join(', ')}</p>
-                    {bookData.description && (
-                        <div style={{ background: '#222', padding: 10, borderRadius: 8, fontSize: '0.85rem', color: '#ccc', maxHeight: 200, overflowY: 'auto', marginBottom: 20 }}>
-                            {bookData.description}
-                        </div>
-                    )}
+            {mode === 'result' && pendingBooks.length > 0 && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 15 }}>
+                    <h3 style={{ margin: 0 }}>Confirmar Libros ({pendingBooks.filter(b => b.status === 'ready').length})</h3>
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {pendingBooks.map(b => (
+                            <div key={b.isbn} style={{ background: '#333', padding: 10, borderRadius: 10, display: 'flex', gap: 10, alignItems: 'center' }}>
+                                {b.coverUrl ? (
+                                    <img src={b.coverUrl} style={{ width: 40, height: 60, objectFit: 'cover', borderRadius: 4 }} />
+                                ) : (
+                                    <div style={{ width: 40, height: 60, background: '#222', borderRadius: 4 }} />
+                                )}
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#aaa' }}>{b.isbn}</div>
+                                </div>
+                                <button onClick={() => removeItem(b.isbn)} style={{ padding: 10, background: '#444', border: 'none', borderRadius: '50%', color: '#ff4444', width: 35, height: 35, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    ✕
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
                     <div style={{ display: 'flex', gap: 10 }}>
-                        <button onClick={handleConfirm} style={{ flex: 1, padding: 15, background: '#22c55e', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold' }}>
-                            Guardar
+                        <button
+                            onClick={handleConfirm}
+                            disabled={pendingBooks.filter(b => b.status === 'ready').length === 0}
+                            style={{ flex: 1, padding: 15, background: '#22c55e', color: 'white', border: 'none', borderRadius: 12, fontWeight: 'bold', opacity: pendingBooks.filter(b => b.status === 'ready').length === 0 ? 0.5 : 1 }}>
+                            Guardar Todo
                         </button>
-                        <button onClick={() => setMode('idle')} style={{ flex: 1, padding: 15, background: '#4b5563', color: 'white', border: 'none', borderRadius: 8 }}>
-                            Cerrar
+                        <button onClick={() => setMode('idle')} style={{ flex: 1, padding: 15, background: '#4b5563', color: 'white', border: 'none', borderRadius: 12 }}>
+                            Cancelar
                         </button>
                     </div>
                 </div>

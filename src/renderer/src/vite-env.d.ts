@@ -1,4 +1,7 @@
-export { }
+declare module '*.png' {
+    const value: string
+    export default value
+}
 
 declare global {
     interface Window {
@@ -6,6 +9,8 @@ declare global {
             getBooks: () => Promise<any[]>
             saveBook: (book: any) => Promise<any>
             deleteBook: (isbn: string) => Promise<any[]>
+            bulkSaveBooks: (books: any[]) => Promise<any[]>
+            bulkDeleteBooks: (isbns: string[]) => Promise<any[]>
             onUpdate: (callback: (event: any, books: any[]) => void) => void
             getServerInfo: () => Promise<{ ip: string; port: number }>
             getConfig: () => Promise<any>
@@ -15,3 +20,5 @@ declare global {
         }
     }
 }
+
+export { }

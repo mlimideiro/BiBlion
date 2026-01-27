@@ -29,7 +29,7 @@ export interface Config {
     activeLibraryId: string
 }
 
-const DB_PATH = 'db_biblioteka'
+const DB_PATH = 'db_biblion'
 const DB_FILE = path.join(DB_PATH, 'books.json')
 const CONFIG_FILE = path.join(DB_PATH, 'config.json')
 const BACKUP_DIR = path.join(DB_PATH, 'backups')
@@ -114,6 +114,44 @@ export class DataManager {
             return true
         }
         return false
+    }
+
+    public saveBooks(booksToSave: Book[]) {
+        const books = this.getAllBooks()
+        // Create Backup
+        this.createBackup(books)
+
+        let changed = false
+        booksToSave.forEach(book => {
+            const index = books.findIndex(b => b.isbn === book.isbn)
+            if (index >= 0) {
+                books[index] = { ...books[index], ...book, updatedAt: new Date().toISOString() }
+                changed = true
+            } else {
+                // Determine if we should really create new books in bulk save? Assuming yes.
+                book.createdAt = new Date().toISOString()
+                book.updatedAt = book.createdAt
+                books.push(book)
+                changed = true
+            }
+        })
+
+        if (changed) {
+            fs.writeJsonSync(DB_FILE, books, { spaces: 2 })
+        }
+        return books
+    }
+
+    public deleteBooks(isbns: string[]) {
+        const books = this.getAllBooks()
+        const filteredBooks = books.filter(b => !isbns.includes(b.isbn))
+
+        if (filteredBooks.length !== books.length) {
+            this.createBackup(books)
+            fs.writeJsonSync(DB_FILE, filteredBooks, { spaces: 2 })
+            return filteredBooks
+        }
+        return books
     }
 
     private createBackup(books: Book[]) {

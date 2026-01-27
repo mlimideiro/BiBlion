@@ -54,6 +54,9 @@ export class MetadataService {
             }
         }
 
+        if (book) {
+            book.isbn = isbn
+        }
         return book
     }
 

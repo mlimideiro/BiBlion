@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('electron', {
     getBooks: () => ipcRenderer.invoke('get-books'),
     saveBook: (book: any) => ipcRenderer.invoke('save-book', book),
     deleteBook: (isbn: string) => ipcRenderer.invoke('delete-book', isbn),
+    bulkSaveBooks: (books: any[]) => ipcRenderer.invoke('bulk-save-books', books),
+    bulkDeleteBooks: (isbns: string[]) => ipcRenderer.invoke('bulk-delete-books', isbns),
     onUpdate: (callback: any) => ipcRenderer.on('books-updated', callback),
     getServerInfo: () => ipcRenderer.invoke('get-server-info'),
 
