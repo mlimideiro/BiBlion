@@ -5,3 +5,4 @@ dist
 .env
 db_biblioteka
 !db_biblioteka/.keep
+db_biblion/backups/

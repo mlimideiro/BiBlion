@@ -15,6 +15,7 @@ interface Book {
     publisher?: string
     description?: string
     coverPath?: string
+    pageCount?: number
     libraryId: string
 }
 
@@ -394,6 +395,7 @@ function App() {
                                         <div className="modal-meta">
                                             <p><strong>ISBN:</strong> {selectedBook.isbn}</p>
                                             {selectedBook.publisher && <p><strong>Editorial:</strong> {selectedBook.publisher}</p>}
+                                            {selectedBook.pageCount && <p><strong>Páginas:</strong> {selectedBook.pageCount}</p>}
 
                                             <div className="modal-library-move" style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                 <strong>Biblioteca:</strong>

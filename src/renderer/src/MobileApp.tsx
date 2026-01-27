@@ -4,6 +4,9 @@ import axios from 'axios'
 import Tesseract from 'tesseract.js'
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
+import './mobile.css'
+import { ScanBarcode, Library, Image as ImageIcon, Camera, Search, ChevronRight, X, Sparkles } from 'lucide-react'
+import logo from './assets/logo.png'
 
 interface BookMetadata {
     isbn: string
@@ -16,10 +19,12 @@ interface BookMetadata {
     status: 'loading' | 'ready' | 'error'
 }
 
+type StatusType = 'idle' | 'success' | 'processing' | 'error' | 'warning'
+
 function MobileApp() {
     const [mode, setMode] = useState<'idle' | 'scanning' | 'cropping' | 'processing' | 'result'>('idle')
     const [isBurstMode, setIsBurstMode] = useState(false)
-    const [log, setLog] = useState<string[]>(['Listo.'])
+    const [status, setStatus] = useState<{ msg: string; type: StatusType }>({ msg: 'Listo para escaneo', type: 'idle' })
     const [pendingBooks, setPendingBooks] = useState<BookMetadata[]>([])
     const [manualIsbn, setManualIsbn] = useState('')
     const scannerRef = useRef<Html5Qrcode | null>(null)
@@ -33,22 +38,24 @@ function MobileApp() {
     const [crop, setCrop] = useState<Crop>()
     const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
 
-    const addLog = (msg: string) => setLog(prev => [...prev.slice(-4), msg])
+    const updateStatus = (msg: string, type: StatusType = 'processing') => {
+        setStatus({ msg, type })
+    }
 
     const startScanner = async (burst: boolean) => {
         setIsBurstMode(burst)
         setMode('scanning')
-        addLog('Iniciando cámara...')
+        updateStatus('Iniciando cámara...', 'processing')
 
         if (!window.isSecureContext && window.location.hostname !== 'localhost') {
-            addLog('⚠️ Alerta: Cámara requiere HTTPS o ajuste "flags" en Chrome.')
+            updateStatus('⚠️ Requiere HTTPS para cámara', 'warning')
         }
 
         await new Promise(r => setTimeout(r, 200))
 
         try {
             if (!document.getElementById('reader')) {
-                throw new Error('No se encontró el contenedor de video')
+                throw new Error('Contenedor no hallado')
             }
 
             if (scannerRef.current) {
@@ -65,14 +72,13 @@ function MobileApp() {
                 (decodedText) => {
                     const cleanIsbn = decodedText.replace(/-/g, '')
                     if (cleanIsbn.length === 10 || cleanIsbn.length === 13) {
-                        // Prevent repetitive scans of the same ISBN too quickly
                         if (cleanIsbn === lastScannedIsbn.current) return
 
                         lastScannedIsbn.current = cleanIsbn
                         if (scanTimeout.current) clearTimeout(scanTimeout.current)
                         scanTimeout.current = setTimeout(() => { lastScannedIsbn.current = null }, 3000)
 
-                        addLog(`¡Leído! ${cleanIsbn}`)
+                        updateStatus(`¡Leído! ${cleanIsbn}`, 'success')
 
                         if (!burst) {
                             scanner.stop().then(() => {
@@ -80,16 +86,15 @@ function MobileApp() {
                                 handleLookup(cleanIsbn, burst)
                             }).catch(console.error)
                         } else {
-                            // In Burst Mode, just add to queue and keep scanning
                             handleLookup(cleanIsbn, burst)
                         }
                     }
                 },
                 (_errorMessage) => { }
             )
-            addLog(burst ? 'Modo Ráfaga activo. Escanea varios libros.' : 'Cámara activa. Apunta al código de barras.')
+            updateStatus(burst ? 'Modo Ráfaga: Escanea varios' : 'Apunta al código de barras', 'idle')
         } catch (err: any) {
-            addLog('Error cámara: ' + err.message)
+            updateStatus('Error cámara: ' + err.message, 'error')
             setMode('idle')
         }
     }
@@ -108,22 +113,10 @@ function MobileApp() {
 
     function onImageLoad(e: React.SyntheticEvent<HTMLImageElement>) {
         const { width, height } = e.currentTarget
-        // For free-form crop without aspect ratio, we can just pass 1 (or any number) and use it as a placeholder if the library requires it
-        // Or better, use Percentage crop directly
         const initialCrop = centerCrop(
-            makeAspectCrop(
-                {
-                    unit: '%',
-                    width: 90,
-                },
-                1, // Default aspect if needed, but we wanted free-form. 
-                width,
-                height,
-            ),
-            width,
-            height,
+            makeAspectCrop({ unit: '%', width: 90 }, 1, width, height),
+            width, height
         )
-        // Adjust the crop to be free-form after creation
         setCrop(initialCrop)
     }
 
@@ -131,7 +124,7 @@ function MobileApp() {
         if (!completedCrop || !imgRef.current) return
 
         setMode('processing')
-        addLog('Extrayendo texto...')
+        updateStatus('Extrayendo texto...', 'processing')
 
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d')
@@ -145,27 +138,18 @@ function MobileApp() {
 
         ctx.drawImage(
             imgRef.current,
-            completedCrop.x * scaleX,
-            completedCrop.y * scaleY,
-            completedCrop.width * scaleX,
-            completedCrop.height * scaleY,
-            0,
-            0,
-            completedCrop.width * scaleX,
-            completedCrop.height * scaleY,
+            completedCrop.x * scaleX, completedCrop.y * scaleY,
+            completedCrop.width * scaleX, completedCrop.height * scaleY,
+            0, 0,
+            completedCrop.width * scaleX, completedCrop.height * scaleY
         )
 
         canvas.toBlob(async (blob) => {
             if (!blob) return
             try {
-                const result = await Tesseract.recognize(
-                    blob,
-                    'eng',
-                    { logger: m => console.log(m) }
-                )
-
+                const result = await Tesseract.recognize(blob, 'eng')
                 const text = result.data.text
-                addLog('Buscando números...')
+                updateStatus('Buscando números...', 'processing')
 
                 const numbers = text.replace(/[^0-9X\n ]/gi, '')
                 const candidates = numbers.match(/(?:97[89][-\s]?)?\d{1,5}[-\s]?\d{1,7}[-\s]?\d{1,6}[-\s]?\d{1}/g)
@@ -182,14 +166,14 @@ function MobileApp() {
                 }
 
                 if (foundIsbn) {
-                    addLog(`Detectado: ${foundIsbn}`)
+                    updateStatus(`Detectado: ${foundIsbn}`, 'success')
                     handleLookup(foundIsbn, false)
                 } else {
-                    addLog('No se encontró un ISBN válido en el recorte.')
+                    updateStatus('ISBN no hallado', 'error')
                     setMode('idle')
                 }
             } catch (err: any) {
-                addLog('Error OCR: ' + err.message)
+                updateStatus('Error OCR: ' + err.message, 'error')
                 setMode('idle')
             }
         }, 'image/jpeg')
@@ -198,244 +182,251 @@ function MobileApp() {
     const handleManualSubmit = () => {
         const clean = manualIsbn.replace(/-/g, '').trim()
         if (clean.length < 10) {
-            addLog('ISBN muy corto.')
+            updateStatus('ISBN muy corto', 'warning')
             return
         }
         handleLookup(clean, isBurstMode)
     }
 
     const handleLookup = async (isbn: string, isBurst: boolean) => {
-        if (!isBurst) {
-            setMode('processing')
-        }
+        if (!isBurst) setMode('processing')
 
         if (sessionIsbns.current.has(isbn)) {
-            addLog(`Ya procesando ${isbn}`)
+            updateStatus(`Ya en cola: ${isbn}`, 'warning')
             return
         }
 
         sessionIsbns.current.add(isbn)
-
         const newPending: BookMetadata = {
-            isbn,
-            title: 'Buscando...',
-            authors: [],
-            status: 'loading'
+            isbn, title: 'Buscando...', authors: [], status: 'loading'
         }
 
         setPendingBooks(prev => [newPending, ...prev])
-        addLog(`Buscando ${isbn}...`)
+        updateStatus(`Buscando ${isbn}...`, 'processing')
 
         try {
             const res = await axios.get(`/api/lookup/${isbn}`)
             setPendingBooks(prev => prev.map(b =>
                 b.isbn === isbn ? { ...res.data, isbn, status: 'ready' } : b
             ))
-
-            if (!isBurst) {
-                setMode('result')
-            }
+            updateStatus(`¡Listo! ${isbn}`, 'success')
+            if (!isBurst) setMode('result')
         } catch (err) {
-            addLog(`Error en ${isbn}`)
+            updateStatus(`Falló ${isbn}`, 'error')
             setPendingBooks(prev => prev.map(b =>
                 b.isbn === isbn ? { ...b, title: 'No encontrado', status: 'error' } : b
             ))
-            if (!isBurst) {
-                setMode('idle')
-            }
+            if (!isBurst) setMode('idle')
         }
     }
 
     const removeItem = (isbn: string) => {
         setPendingBooks(prev => prev.filter(b => b.isbn !== isbn))
-        // We don't remove from sessionIsbns to avoid re-scanning the same mistake immediately 
-        // until the app is reset or the user stops/starts
     }
 
     const handleConfirm = async () => {
         const readyBooks = pendingBooks.filter(b => b.status === 'ready')
         if (readyBooks.length === 0) return
 
-        addLog(`Guardando ${readyBooks.length} libros...`)
+        updateStatus(`Guardando ${readyBooks.length} libros...`, 'processing')
         setMode('processing')
 
         try {
             for (const book of readyBooks) {
                 await axios.post('/api/save', book)
             }
-            addLog('¡Todo guardado!')
+            updateStatus('¡Todo guardado!', 'success')
             setTimeout(() => {
                 setPendingBooks([])
-                sessionIsbns.current.clear() // Clear for a fresh new scan session
+                sessionIsbns.current.clear()
                 setManualIsbn('')
                 setMode('idle')
+                updateStatus('Listo para escaneo', 'idle')
             }, 2000)
         } catch (err) {
-            addLog('Falló el guardado masivo.')
+            updateStatus('Error al guardar', 'error')
             setMode('result')
         }
     }
 
-    return (
-        <div style={{ padding: 15, background: '#1a1a1a', minHeight: '100vh', color: '#eee', fontFamily: 'sans-serif', display: 'flex', flexDirection: 'column' }}>
-            <h1 style={{ textAlign: 'center', marginBottom: 20 }}>BiBlion Móvil</h1>
+    const stopScanning = () => {
+        if (scannerRef.current) {
+            scannerRef.current.stop().then(() => {
+                setMode('idle')
+                updateStatus('Listo para escaneo', 'idle')
+            }).catch(() => setMode('idle'))
+        } else {
+            setMode('idle')
+        }
+    }
 
-            <div style={{ background: '#000', color: '#0f0', padding: 10, borderRadius: 5, marginBottom: 20, fontSize: '0.9rem', minHeight: 60 }}>
-                {log.map((l, i) => <div key={i}>{l}</div>)}
+    return (
+        <div className="mobile-container">
+            <div className={`status-bar ${status.type}`}>
+                {status.msg}
             </div>
 
-            {mode === 'idle' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                        <button
-                            onClick={() => startScanner(false)}
-                            style={{ padding: 20, fontSize: '1.1rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 12, fontWeight: 'bold' }}>
-                            📷 Uno solo
-                        </button>
-                        <button
-                            onClick={() => startScanner(true)}
-                            style={{ padding: 20, fontSize: '1.1rem', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 12, fontWeight: 'bold' }}>
-                            🚀 Ráfaga
-                        </button>
-                    </div>
+            <header className="mobile-header">
+                <img src={logo} alt="BiBlion" />
+                <h1>BiBlion Móvil</h1>
+            </header>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                        <label style={{
-                            padding: 15, background: '#8b5cf6', color: 'white', borderRadius: 12, fontWeight: 'bold', textAlign: 'center', cursor: 'pointer'
-                        }}>
-                            📸 Foto ISBN
+            <main className="mobile-content">
+                {mode === 'idle' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        <button className="menu-card" onClick={() => startScanner(false)}>
+                            <div className="menu-card-icon">
+                                <ScanBarcode size={40} strokeWidth={1.5} />
+                            </div>
+                            <div className="menu-card-content">
+                                <span className="menu-card-title">Escanear un libro</span>
+                                <span className="menu-card-subtitle">Escanea ISBN de un solo libro</span>
+                            </div>
+                            <div className="menu-card-chevron">
+                                <ChevronRight size={24} />
+                            </div>
+                        </button>
+
+                        <button className="menu-card" onClick={() => startScanner(true)}>
+                            <div className="menu-card-icon">
+                                <Library size={40} strokeWidth={1.5} />
+                            </div>
+                            <div className="menu-card-content">
+                                <span className="menu-card-title">Escanear varios libros</span>
+                                <span className="menu-card-subtitle">Escanea ISBN de varios libros </span>
+                            </div>
+                            <div className="menu-card-chevron">
+                                <ChevronRight size={24} />
+                            </div>
+                        </button>
+
+                        <label className="menu-card">
                             <input type="file" accept="image/*" capture="environment" onChange={onSelectFile} style={{ display: 'none' }} />
+                            <div className="menu-card-icon">
+                                <Camera size={40} strokeWidth={1.5} />
+                            </div>
+                            <div className="menu-card-content">
+                                <span className="menu-card-title">Foto ISBN</span>
+                                <span className="menu-card-subtitle">Escanea ISBN desde la cámara</span>
+                            </div>
+                            <div className="menu-card-chevron">
+                                <ChevronRight size={24} />
+                            </div>
                         </label>
-                        <label style={{
-                            padding: 15, background: '#a855f7', color: 'white', borderRadius: 12, fontWeight: 'bold', textAlign: 'center', cursor: 'pointer'
-                        }}>
-                            🖼️ Galería
-                            <input type="file" accept="image/*" onChange={onSelectFile} style={{ display: 'none' }} />
-                        </label>
-                    </div>
 
-                    <div style={{ background: '#333', padding: 15, borderRadius: 12 }}>
-                        <div style={{ display: 'flex', gap: 10 }}>
+                        <label className="menu-card">
+                            <input type="file" accept="image/*" onChange={onSelectFile} style={{ display: 'none' }} />
+                            <div className="menu-card-icon">
+                                <ImageIcon size={40} strokeWidth={1.5} />
+                            </div>
+                            <div className="menu-card-content">
+                                <span className="menu-card-title">Desde galería</span>
+                                <span className="menu-card-subtitle">Detecta ISBN desde una foto</span>
+                            </div>
+                            <div className="menu-card-chevron">
+                                <ChevronRight size={24} />
+                            </div>
+                        </label>
+
+                        <div className="manual-input-container" style={{ marginTop: 10 }}>
                             <input
                                 type="number"
                                 value={manualIsbn}
                                 onChange={(e) => setManualIsbn(e.target.value)}
-                                placeholder="ISBN manual..."
-                                style={{ flex: 1, padding: 10, borderRadius: 6, border: 'none', background: '#222', color: 'white' }}
+                                placeholder="Ingresar ISBN manualmente"
                             />
-                            <button onClick={handleManualSubmit} style={{ padding: '10px 20px', background: '#555', color: 'white', border: 'none', borderRadius: 6 }}>
-                                🔍
+                            <button onClick={handleManualSubmit} className="search-btn">
+                                <Search size={22} />
                             </button>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {mode === 'cropping' && (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <p style={{ textAlign: 'center', margin: '0 0 10px 0' }}>Encuadra el número ISBN:</p>
-                    <div style={{ flex: 1, overflow: 'auto', background: '#000', borderRadius: 8 }}>
+                {mode === 'cropping' && (
+                    <div className="full-screen-container">
+                        <div style={{ padding: 15, textAlign: 'center', fontSize: '0.9rem', color: '#888' }}>
+                            Encuadra el número ISBN
+                        </div>
                         <ReactCrop
                             crop={crop}
                             onChange={(c) => setCrop(c)}
                             onComplete={(c) => setCompletedCrop(c)}
                         >
-                            <img ref={imgRef} src={imgSrc} onLoad={onImageLoad} style={{ maxWidth: '100%' }} />
+                            <img ref={imgRef} src={imgSrc} onLoad={onImageLoad} style={{ width: '100%' }} />
                         </ReactCrop>
                     </div>
-                    <div style={{ display: 'flex', gap: 10, marginTop: 15 }}>
-                        <button
-                            onClick={handleCropComplete}
-                            style={{ flex: 1, padding: 15, background: '#22c55e', color: 'white', border: 'none', borderRadius: 12, fontWeight: 'bold' }}>
-                            ✅ Confirmar
-                        </button>
-                        <button
-                            onClick={() => setMode('idle')}
-                            style={{ flex: 1, padding: 15, background: '#4b5563', color: 'white', border: 'none', borderRadius: 12 }}>
-                            Cancelar
-                        </button>
+                )}
+
+                {mode === 'scanning' && (
+                    <div className="full-screen-container">
+                        <div id="reader"></div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {mode === 'scanning' && (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <div id="reader" style={{ width: '100%', background: '#000', borderRadius: 8, overflow: 'hidden', flex: 1 }}></div>
-
-                    {isBurstMode && pendingBooks.length > 0 && (
-                        <div style={{ marginTop: 10, maxHeight: 150, overflowY: 'auto', background: '#222', borderRadius: 8, padding: 5 }}>
-                            {pendingBooks.map(b => (
-                                <div key={b.isbn} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 10px', borderBottom: '1px solid #333', fontSize: '0.8rem' }}>
-                                    <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {b.status === 'loading' ? '⌛' : '✅'} {b.title}
-                                    </span>
-                                    <button onClick={() => removeItem(b.isbn)} style={{ background: 'none', border: 'none', color: '#ff4444' }}>✕</button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    <div style={{ display: 'flex', gap: 10, marginTop: 15 }}>
-                        {isBurstMode && pendingBooks.length > 0 && (
-                            <button
-                                onClick={() => {
-                                    if (scannerRef.current) scannerRef.current.stop().then(() => setMode('result'))
-                                }}
-                                style={{ flex: 1, padding: 15, background: '#22c55e', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold' }}>
-                                Revisar ({pendingBooks.length})
-                            </button>
-                        )}
-                        <button onClick={(() => {
-                            if (scannerRef.current) scannerRef.current.stop().then(() => setMode('idle'))
-                            else setMode('idle')
-                        })} style={{ flex: 1, padding: 15, background: '#ef4444', color: 'white', border: 'none', borderRadius: 8 }}>
-                            Detener
-                        </button>
+                {mode === 'processing' && (
+                    <div style={{ textAlign: 'center', marginTop: 100 }}>
+                        <div style={{ fontSize: '3rem', animation: 'spin 2s linear infinite' }}>🔄</div>
+                        <p style={{ marginTop: 20, fontSize: '1.2rem', color: '#888' }}>Trabajando...</p>
+                        <style>{`@keyframes spin { 100% { transform:rotate(360deg); } }`}</style>
                     </div>
-                </div>
-            )}
+                )}
 
-            {mode === 'processing' && (
-                <div style={{ textAlign: 'center', padding: 40 }}>
-                    <div className="spinner" style={{ fontSize: '3rem', marginBottom: 20 }}>🔄</div>
-                    <p>Procesando...</p>
-                </div>
-            )}
-
-            {mode === 'result' && pendingBooks.length > 0 && (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 15 }}>
-                    <h3 style={{ margin: 0 }}>Confirmar Libros ({pendingBooks.filter(b => b.status === 'ready').length})</h3>
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {mode === 'result' && pendingBooks.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         {pendingBooks.map(b => (
-                            <div key={b.isbn} style={{ background: '#333', padding: 10, borderRadius: 10, display: 'flex', gap: 10, alignItems: 'center' }}>
+                            <div key={b.isbn} className="book-card-mobile">
                                 {b.coverUrl ? (
-                                    <img src={b.coverUrl} style={{ width: 40, height: 60, objectFit: 'cover', borderRadius: 4 }} />
+                                    <img src={b.coverUrl} style={{ width: 45, height: 65, objectFit: 'cover', borderRadius: 4 }} />
                                 ) : (
-                                    <div style={{ width: 40, height: 60, background: '#222', borderRadius: 4 }} />
+                                    <div style={{ width: 45, height: 65, background: '#333', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem' }}>Sin Tapa</div>
                                 )}
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</div>
-                                    <div style={{ fontSize: '0.75rem', color: '#aaa' }}>{b.isbn}</div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontWeight: 'bold', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#888' }}>{b.isbn}</div>
                                 </div>
-                                <button onClick={() => removeItem(b.isbn)} style={{ padding: 10, background: '#444', border: 'none', borderRadius: '50%', color: '#ff4444', width: 35, height: 35, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    ✕
+                                <button onClick={() => removeItem(b.isbn)} style={{ background: 'none', border: 'none', color: '#ff4444', padding: 10 }}>
+                                    <X size={20} />
                                 </button>
                             </div>
                         ))}
                     </div>
+                )}
+            </main>
 
-                    <div style={{ display: 'flex', gap: 10 }}>
-                        <button
-                            onClick={handleConfirm}
-                            disabled={pendingBooks.filter(b => b.status === 'ready').length === 0}
-                            style={{ flex: 1, padding: 15, background: '#22c55e', color: 'white', border: 'none', borderRadius: 12, fontWeight: 'bold', opacity: pendingBooks.filter(b => b.status === 'ready').length === 0 ? 0.5 : 1 }}>
-                            Guardar Todo
-                        </button>
-                        <button onClick={() => setMode('idle')} style={{ flex: 1, padding: 15, background: '#4b5563', color: 'white', border: 'none', borderRadius: 12 }}>
-                            Cancelar
-                        </button>
-                    </div>
-                </div>
+            {/* Sticky Footer for Actions */}
+            {(mode === 'scanning' || mode === 'cropping' || mode === 'result') && (
+                <footer className="sticky-footer">
+                    {mode === 'scanning' ? (
+                        <>
+                            {isBurstMode && pendingBooks.length > 0 && (
+                                <button onClick={() => { scannerRef.current?.stop().then(() => setMode('result')) }} className="mobile-btn btn-success" style={{ flex: 2 }}>
+                                    <Sparkles size={18} /> Revisar ({pendingBooks.length})
+                                </button>
+                            )}
+                            <button onClick={stopScanning} className="mobile-btn btn-danger" style={{ flex: 1 }}>
+                                <X size={18} /> Detener
+                            </button>
+                        </>
+                    ) : mode === 'cropping' ? (
+                        <>
+                            <button onClick={handleCropComplete} className="mobile-btn btn-success" style={{ flex: 1 }}>
+                                Confirmar
+                            </button>
+                            <button onClick={() => setMode('idle')} className="mobile-btn btn-secondary" style={{ flex: 1 }}>
+                                Cancelar
+                            </button>
+                        </>
+                    ) : mode === 'result' ? (
+                        <>
+                            <button onClick={handleConfirm} className="mobile-btn btn-success" style={{ flex: 2 }}>
+                                Guardar Todo
+                            </button>
+                            <button onClick={() => setMode('idle')} className="mobile-btn btn-secondary" style={{ flex: 1 }}>
+                                Cancelar
+                            </button>
+                        </>
+                    ) : null}
+                </footer>
             )}
         </div>
     )
