@@ -30,18 +30,15 @@ interface Config {
     activeLibraryId: string
     tags: string[]
 }
-
 function App() {
     const [books, setBooks] = useState<Book[]>([])
     const [config, setConfig] = useState<Config | null>(null)
     const [filteredBooks, setFilteredBooks] = useState<Book[]>([])
     const [serverInfo, setServerInfo] = useState<{ ip: string; port: number } | null>(null)
-
     const [menuOpen, setMenuOpen] = useState(false)
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [isSelectionMode, setIsSelectionMode] = useState(false)
     const [selectedIsbns, setSelectedIsbns] = useState<string[]>([])
-    const [isRepairing, setIsRepairing] = useState<string | null>(null)
     const [thumbnailSize, setThumbnailSize] = useState<'S' | 'M' | 'L' | 'XL'>(
         (localStorage.getItem('thumbSize') as any) || 'L'
     )

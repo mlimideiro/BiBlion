@@ -33,6 +33,9 @@ export const BookListItem: React.FC<Props> = ({ book, isSelectionMode, isSelecte
                 ) : (
                     <div className="placeholder-cover">Sin Tapa</div>
                 )}
+                {(!book.coverPath || book.authors.length === 0) && (
+                    <div className="incomplete-badge">Incompleto</div>
+                )}
             </div>
             <div className="book-info">
                 <h3>{book.title}</h3>

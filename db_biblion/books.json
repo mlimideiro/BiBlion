@@ -69,7 +69,7 @@
     "description": "\"Cuentos completos de Leonora Carrington reúne los relatos publicados en La casa del miedo, El séptimo caballo e incluye tres cuentos inéditos en español: \"El camello de arena\", \"El vuelo de Mr. Gregory\" y \"Jemima y el Lobo\". La recolección de estas historias en un solo tomo permite al lector adentrarse por completo en la imaginación de Leonora Carrington y fascinarse por sus historias fantásticas, el mundo onírico y su percepción de la realidad de forma macabra, satírica y brillante.\"",
     "coverPath": "",
     "createdAt": "2026-01-27T14:21:57.228Z",
-    "updatedAt": "2026-01-27T14:25:04.673Z",
+    "updatedAt": "2026-01-27T23:41:35.490Z",
     "libraryId": "1769470701100"
   },
   {
@@ -116,5 +116,15 @@
       "libro objeto",
       "dany"
     ]
+  },
+  {
+    "isbn": "9789509749573",
+    "title": "Curriculum vitae, la autobiografía de Muriel Spark. Traducción de Ariel Dilon",
+    "authors": [],
+    "coverPath": "http://dcdn-us.mitiendanube.com/stores/001/228/817/products/curriculum-vitae-muriel-spark1-a0268d3753057d705816677742829484-640-0.webp",
+    "createdAt": "2026-01-28T00:02:53.302Z",
+    "updatedAt": "2026-01-28T03:37:26.727Z",
+    "libraryId": "1769470701100",
+    "description": "Muriel Spark —autora de una gran imaginación novelística— decidió escribir su autobiografía sin contar nada que no pudiera probar documentalmente. No es just..."
   }
 ]

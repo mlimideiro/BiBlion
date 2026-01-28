@@ -38,6 +38,11 @@ function MobileApp() {
     const [crop, setCrop] = useState<Crop>()
     const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
 
+    // Camera capabilities
+    const [capabilities, setCapabilities] = useState<any>(null)
+    const [torchOn, setTorchOn] = useState(false)
+    const [zoom, setZoom] = useState(1)
+
     const updateStatus = (msg: string, type: StatusType = 'processing') => {
         setStatus({ msg, type })
     }
@@ -92,6 +97,18 @@ function MobileApp() {
                 },
                 (_errorMessage) => { }
             )
+
+            // Try to get capabilities after start
+            try {
+                const caps = scanner.getRunningTrackCapabilities()
+                console.log('[MobileApp] Camera capabilities:', caps)
+                setCapabilities(caps)
+                // Set initial zoom
+                if ((caps as any).zoom) setZoom((caps as any).zoom.min || 1)
+            } catch (e) {
+                console.warn('[MobileApp] Could not get capabilities:', e)
+            }
+
             updateStatus(burst ? 'Modo Ráfaga: Escanea varios' : 'Apunta al código de barras', 'idle')
         } catch (err: any) {
             updateStatus('Error cámara: ' + err.message, 'error')
@@ -214,11 +231,11 @@ function MobileApp() {
             updateStatus(`¡Listo! ${isbn}`, 'success')
             if (!isBurst) setMode('result')
         } catch (err) {
-            updateStatus(`Falló ${isbn}`, 'error')
+            updateStatus(`No se encontró metadata para ${isbn}`, 'warning')
             setPendingBooks(prev => prev.map(b =>
-                b.isbn === currentIsbn ? { ...b, title: 'No encontrado', status: 'error' } : b
+                b.isbn === currentIsbn ? { ...b, title: '', status: 'error' } : b
             ))
-            if (!isBurst) setMode('idle')
+            if (!isBurst) setMode('result') // Go to result anyway to allow manual entry
         }
     }
 
@@ -227,14 +244,17 @@ function MobileApp() {
     }
 
     const handleConfirm = async () => {
-        const readyBooks = pendingBooks.filter(b => b.status === 'ready')
-        if (readyBooks.length === 0) return
+        const booksToSave = pendingBooks.filter(b => b.status === 'ready' || (b.status === 'error' && b.title.trim() !== ''))
+        if (booksToSave.length === 0) {
+            updateStatus('Agregue un título a los fallidos', 'warning')
+            return
+        }
 
-        updateStatus(`Guardando ${readyBooks.length} libros...`, 'processing')
+        updateStatus(`Guardando ${booksToSave.length} libros...`, 'processing')
         setMode('processing')
 
         try {
-            for (const book of readyBooks) {
+            for (const book of booksToSave) {
                 await axios.post('/api/save', book)
             }
             updateStatus('¡Todo guardado!', 'success')
@@ -251,12 +271,44 @@ function MobileApp() {
         }
     }
 
+    const toggleTorch = async () => {
+        if (!scannerRef.current || !capabilities?.torch) return
+        const newState = !torchOn
+        try {
+            await scannerRef.current.applyVideoConstraints({
+                advanced: [{ torch: newState }] as any
+            })
+            setTorchOn(newState)
+        } catch (e) {
+            console.error('Error toggling torch:', e)
+        }
+    }
+
+    const handleZoomChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = parseFloat(e.target.value)
+        setZoom(value)
+        if (!scannerRef.current || !capabilities?.zoom) return
+        try {
+            await scannerRef.current.applyVideoConstraints({
+                advanced: [{ zoom: value }] as any
+            })
+        } catch (e) {
+            console.error('Error applying zoom:', e)
+        }
+    }
+
     const stopScanning = () => {
         if (scannerRef.current) {
             scannerRef.current.stop().then(() => {
                 setMode('idle')
+                setCapabilities(null)
+                setTorchOn(false)
                 updateStatus('Listo para escaneo', 'idle')
-            }).catch(() => setMode('idle'))
+            }).catch(() => {
+                setMode('idle')
+                setCapabilities(null)
+                setTorchOn(false)
+            })
         } else {
             setMode('idle')
         }
@@ -362,6 +414,29 @@ function MobileApp() {
                 {mode === 'scanning' && (
                     <div className="full-screen-container">
                         <div id="reader"></div>
+                        <div className="scanner-controls">
+                            {capabilities?.torch && (
+                                <button
+                                    className={`control-btn ${torchOn ? 'active' : ''}`}
+                                    onClick={toggleTorch}
+                                >
+                                    {torchOn ? '🔦 On' : '🔦 Off'}
+                                </button>
+                            )}
+                            {capabilities?.zoom && capabilities.zoom.max > capabilities.zoom.min && (
+                                <div className="zoom-control">
+                                    <span>Zoom</span>
+                                    <input
+                                        type="range"
+                                        min={capabilities.zoom.min}
+                                        max={capabilities.zoom.max}
+                                        step={0.1}
+                                        value={zoom}
+                                        onChange={handleZoomChange}
+                                    />
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 
@@ -383,7 +458,29 @@ function MobileApp() {
                                     <div style={{ width: 45, height: 65, background: '#333', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem' }}>Sin Tapa</div>
                                 )}
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontWeight: 'bold', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</div>
+                                    {b.status === 'error' ? (
+                                        <input
+                                            placeholder="Ingresar título a mano..."
+                                            value={b.title}
+                                            onChange={(e) => {
+                                                const newTitle = e.target.value
+                                                setPendingBooks(prev => prev.map(p =>
+                                                    p.isbn === b.isbn ? { ...p, title: newTitle } : p
+                                                ))
+                                            }}
+                                            style={{
+                                                width: '100%',
+                                                background: '#444',
+                                                border: '1px solid var(--mobile-warning)',
+                                                borderRadius: 4,
+                                                padding: '4px 8px',
+                                                color: '#fff',
+                                                fontSize: '0.9rem'
+                                            }}
+                                        />
+                                    ) : (
+                                        <div style={{ fontWeight: 'bold', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</div>
+                                    )}
                                     <div style={{ fontSize: '0.8rem', color: '#888' }}>{b.isbn}</div>
                                 </div>
                                 <button onClick={() => removeItem(b.isbn)} style={{ background: 'none', border: 'none', color: '#ff4444', padding: 10 }}>
