@@ -249,7 +249,7 @@ function App() {
                 alert("No se encontró información adicional para este libro.")
             }
         } catch (e) {
-            alert("Error al intentar reparar los datos.")
+            alert("Error al intentar completar los datos.")
         } finally {
             setRepairing(false)
         }
@@ -647,7 +647,7 @@ function App() {
                                             <div className="modal-footer" style={{ border: 'none', padding: '20px 0 0 0', marginTop: 'auto' }}>
                                                 <button className="repair-btn" onClick={handleRepair} disabled={repairing}>
                                                     <Sparkles size={18} />
-                                                    <span>{repairing ? 'Buscando...' : 'Reparar Datos'}</span>
+                                                    <span>{repairing ? 'Buscando...' : 'Completar Datos'}</span>
                                                 </button>
                                                 <button className="action-btn danger" onClick={handleDelete}>
                                                     <Trash2 size={18} />
