@@ -3,33 +3,11 @@ import { BookListItem } from './components/BookListItem'
 import { SearchBar } from './components/SearchBar'
 import { Trash2, LayoutGrid, Settings, Download, X, Sparkles } from 'lucide-react'
 import { SettingsModal } from './components/SettingsModal'
+import { dataService } from './services/dataService'
+import { Book, Config, Library } from './types'
 import './index.css'
 import './components/components.css'
 import logo from './assets/logo.png'
-
-// Define types locally or import
-interface Book {
-    isbn: string
-    title: string
-    authors: string[]
-    publisher?: string
-    description?: string
-    coverPath?: string
-    pageCount?: number
-    libraryId?: string
-    tags?: string[]
-}
-
-interface Library {
-    id: string
-    name: string
-}
-
-interface Config {
-    libraries: Library[]
-    activeLibraryId: string
-    tags: string[]
-}
 function App() {
     const [books, setBooks] = useState<Book[]>([])
     const [config, setConfig] = useState<Config | null>(null)
@@ -60,12 +38,12 @@ function App() {
 
     useEffect(() => {
         // Initial fetch
-        window.electron.getBooks().then(setBooks)
-        window.electron.getServerInfo().then(setServerInfo)
-        window.electron.getConfig().then(setConfig)
+        dataService.getBooks().then(setBooks)
+        window.electron?.getServerInfo().then(setServerInfo)
+        dataService.getConfig().then(setConfig)
 
         // Listen for updates
-        window.electron.onUpdate((_event: any, updatedBooks: Book[]) => {
+        window.electron?.onUpdate((_event: any, updatedBooks: Book[]) => {
             setBooks(updatedBooks)
             // Update selectedBook if it's currently open to reflect latest DB changes
             setSelectedBook(prev => {
@@ -75,7 +53,7 @@ function App() {
             })
         })
 
-        window.electron.onConfigUpdate((_event: any, updatedConfig: Config) => {
+        window.electron?.onConfigUpdate((_event: any, updatedConfig: Config) => {
             setConfig(updatedConfig)
         })
 
@@ -143,7 +121,7 @@ function App() {
     const handleSwitchLibrary = async (libId: string) => {
         if (!config) return
         const newConfig = { ...config, activeLibraryId: libId }
-        window.electron.saveConfig(newConfig).then(setConfig)
+        dataService.saveConfig(newConfig).then(setConfig)
     }
 
     const handleSaveLibraries = (libs: Library[], tags: string[]) => {
@@ -190,7 +168,7 @@ function App() {
         if (selectedIsbns.length === 0) return
         if (confirm(`¿Estás seguro de eliminar ${selectedIsbns.length} libros?`)) {
             try {
-                const updatedBooks = await window.electron.bulkDeleteBooks(selectedIsbns)
+                const updatedBooks = await dataService.bulkDeleteBooks(selectedIsbns)
                 setBooks(updatedBooks)
                 setSelectedIsbns([])
                 setIsSelectionMode(false)
@@ -207,7 +185,7 @@ function App() {
                 .filter(b => selectedIsbns.includes(b.isbn))
                 .map(b => ({ ...b, libraryId }))
 
-            const updatedBooks = await window.electron.bulkSaveBooks(booksToUpdate)
+            const updatedBooks = await dataService.bulkSaveBooks(booksToUpdate)
             setBooks(updatedBooks)
             setSelectedIsbns([])
             setIsSelectionMode(false)
@@ -224,7 +202,7 @@ function App() {
         if (!selectedBook) return
         if (confirm('¿Estás seguro de eliminar este libro?')) {
             try {
-                const updatedBooks = await window.electron.deleteBook(selectedBook.isbn)
+                const updatedBooks = await dataService.deleteBook(selectedBook.isbn)
                 setBooks(updatedBooks)
                 setSelectedBook(null)
             } catch (e) {
@@ -238,10 +216,10 @@ function App() {
         if (!selectedBook) return
         setRepairing(true)
         try {
-            const data = await window.electron.repairMetadata(selectedBook.isbn)
+            const data = await dataService.repairMetadata(selectedBook.isbn)
             if (data) {
                 const updatedBook = { ...selectedBook, ...data }
-                const updatedBooks = await window.electron.saveBook(updatedBook)
+                const updatedBooks = await dataService.saveBook(updatedBook)
                 setBooks(updatedBooks)
                 setSelectedBook(updatedBook)
                 alert("¡Datos actualizados!")
@@ -258,7 +236,7 @@ function App() {
     const handleMoveLibrary = async (libraryId: string) => {
         if (!selectedBook) return
         const updatedBook = { ...selectedBook, libraryId }
-        const updatedBooks = await window.electron.saveBook(updatedBook)
+        const updatedBooks = await dataService.saveBook(updatedBook)
         setBooks(updatedBooks)
         setSelectedBook(updatedBook)
     }
@@ -268,7 +246,7 @@ function App() {
         const currentTags = selectedBook.tags || []
         if (currentTags.includes(tagName)) return
         const updatedBook = { ...selectedBook, tags: [...currentTags, tagName] }
-        const updatedBooks = await window.electron.saveBook(updatedBook)
+        const updatedBooks = await dataService.saveBook(updatedBook)
         setBooks(updatedBooks)
         setSelectedBook(updatedBook)
     }
@@ -277,7 +255,7 @@ function App() {
         if (!selectedBook) return
         const currentTags = selectedBook.tags || []
         const updatedBook = { ...selectedBook, tags: currentTags.filter(t => t !== tagName) }
-        const updatedBooks = await window.electron.saveBook(updatedBook)
+        const updatedBooks = await dataService.saveBook(updatedBook)
         setBooks(updatedBooks)
         setSelectedBook(updatedBook)
     }
@@ -286,7 +264,7 @@ function App() {
         if (!selectedBook) return
         try {
             const updatedBook = { ...selectedBook, ...updatedData }
-            const updatedBooks = await window.electron.saveBook(updatedBook)
+            const updatedBooks = await dataService.saveBook(updatedBook)
             setBooks(updatedBooks)
             setSelectedBook(updatedBook)
             setIsEditingBook(false)
@@ -298,11 +276,11 @@ function App() {
     const handleScrape = async () => {
         if (!scraperUrl) return
         try {
-            const data = await window.electron.scrapeMetadata(scraperUrl)
+            const data = await dataService.scrapeMetadata(scraperUrl)
             if (data && selectedBook) {
                 const updatedBook = { ...selectedBook, ...data }
                 // Persist the changes immediately
-                const updatedBooks = await window.electron.saveBook(updatedBook)
+                const updatedBooks = await dataService.saveBook(updatedBook)
                 setBooks(updatedBooks)
                 setSelectedBook(updatedBook)
                 setScraperUrl('')
@@ -497,7 +475,7 @@ function App() {
                             <div className="modal-body">
                                 <div className="modal-cover">
                                     {selectedBook.coverPath ? (
-                                        <img src={selectedBook.coverPath.startsWith('http') ? selectedBook.coverPath : `file://${selectedBook.coverPath}`} alt={selectedBook.title} />
+                                        <img src={dataService.getCoverUrl(selectedBook)} alt={selectedBook.title} />
                                     ) : (
                                         <div className="placeholder-cover">Sin Tapa</div>
                                     )}

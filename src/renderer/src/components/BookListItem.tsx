@@ -1,22 +1,24 @@
 import React from 'react'
-
-interface Book {
-    isbn: string
-    title: string
-    authors: string[]
-    coverPath?: string
-}
+import { Book } from '../types'
+import { dataService } from '../services/dataService'
 
 interface Props {
     book: Book
     isSelectionMode: boolean
     isSelected: boolean
     onToggleSelection: (e: React.MouseEvent) => void
+    layoutMode?: 'list' | 'grid' | 'full'
 }
 
-export const BookListItem: React.FC<Props> = ({ book, isSelectionMode, isSelected, onToggleSelection }) => {
+export const BookListItem: React.FC<Props> = ({
+    book,
+    isSelectionMode,
+    isSelected,
+    onToggleSelection,
+    layoutMode = 'grid'
+}) => {
     return (
-        <div className={`book-item ${isSelected ? 'selected' : ''}`}>
+        <div className={`book-item ${isSelected ? 'selected' : ''} mode-${layoutMode}`}>
             <div className="book-cover">
                 {isSelectionMode && (
                     <div className="selection-overlay" onClick={onToggleSelection}>
@@ -27,7 +29,7 @@ export const BookListItem: React.FC<Props> = ({ book, isSelectionMode, isSelecte
                 )}
                 {book.coverPath ? (
                     <img
-                        src={book.coverPath.startsWith('http') ? book.coverPath : `file://${book.coverPath}`}
+                        src={dataService.getCoverUrl(book)}
                         alt={book.title}
                     />
                 ) : (

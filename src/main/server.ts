@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import path from 'path'
+import fs from 'fs'
 import ip from 'ip'
 import { DataManager, Book } from './dataManager'
 import { MetadataService } from './metadataService'
@@ -18,13 +19,33 @@ export function startServer(dataManager: DataManager, metadataService: MetadataS
     app.use(express.static(staticPath, { index: false }))
 
     // Explicitly serve mobile.html for root request
-    app.get('/', (req, res) => {
+    app.get('/', (_req, res) => {
         res.sendFile(path.join(staticPath, 'mobile.html'))
     })
 
     // Explicit fallback for /mobile.html if requested directly
-    app.get('/mobile.html', (req, res) => {
+    app.get('/mobile.html', (_req, res) => {
         res.sendFile(path.join(staticPath, 'mobile.html'))
+    })
+
+    app.get('/api/books', (_req, res) => {
+        const books = dataManager.getAllBooks()
+        res.json(books)
+    })
+
+    app.get('/api/config', (_req, res) => {
+        const config = dataManager.getConfig()
+        res.json(config)
+    })
+
+    app.get('/api/covers/:filename', (req, res) => {
+        const { filename } = req.params
+        const filePath = path.join(process.cwd(), 'db_biblion', 'covers', filename)
+        if (fs.existsSync(filePath)) {
+            res.sendFile(filePath)
+        } else {
+            res.status(404).send('Cover not found')
+        }
     })
 
     app.get('/api/lookup/:isbn', async (req, res) => {
@@ -42,18 +63,10 @@ export function startServer(dataManager: DataManager, metadataService: MetadataS
         const bookData = req.body
         console.log('Saving book:', bookData.title)
 
-        // Fallback if coverUrl is missing
-        const finalCover = bookData.coverUrl || ''
-
+        // If it's a full book object from the library view, it might have libraryId and tags
         const newBook: Book = {
-            isbn: bookData.isbn,
-            title: bookData.title,
-            authors: bookData.authors,
-            publisher: bookData.publisher,
-            pageCount: bookData.pageCount,
-            description: bookData.description,
-            coverPath: finalCover,
-            createdAt: new Date().toISOString(),
+            ...bookData,
+            createdAt: bookData.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString()
         }
 
@@ -61,6 +74,13 @@ export function startServer(dataManager: DataManager, metadataService: MetadataS
         onBookUpdate(newBook)
 
         res.json({ success: true, book: newBook })
+    })
+
+    app.post('/api/config', (req, res) => {
+        const configData = req.body
+        console.log('Updating config from mobile')
+        dataManager.saveConfig(configData)
+        res.json({ success: true })
     })
 
     app.listen(PORT, '0.0.0.0', () => {

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import axios from 'axios'
 import Tesseract from 'tesseract.js'
@@ -7,6 +7,9 @@ import 'react-image-crop/dist/ReactCrop.css'
 import './mobile.css'
 import { ScanBarcode, Library, Image as ImageIcon, Camera, Search, ChevronRight, X, Sparkles } from 'lucide-react'
 import logo from './assets/logo.png'
+import { LibraryView } from './components/LibraryView'
+import { Book, Config } from './types'
+import { dataService } from './services/dataService'
 
 interface BookMetadata {
     isbn: string
@@ -22,7 +25,9 @@ interface BookMetadata {
 type StatusType = 'idle' | 'success' | 'processing' | 'error' | 'warning'
 
 function MobileApp() {
-    const [mode, setMode] = useState<'idle' | 'scanning' | 'cropping' | 'processing' | 'result'>('idle')
+    const [mode, setMode] = useState<'idle' | 'scanning' | 'cropping' | 'processing' | 'result' | 'library'>('idle')
+    const [books, setBooks] = useState<Book[]>([])
+    const [config, setConfig] = useState<Config | null>(null)
     const [isBurstMode, setIsBurstMode] = useState(false)
     const [status, setStatus] = useState<{ msg: string; type: StatusType }>({ msg: 'Listo para escaneo', type: 'idle' })
     const [pendingBooks, setPendingBooks] = useState<BookMetadata[]>([])
@@ -42,6 +47,13 @@ function MobileApp() {
     const [capabilities, setCapabilities] = useState<any>(null)
     const [torchOn, setTorchOn] = useState(false)
     const [zoom, setZoom] = useState(1)
+
+    useEffect(() => {
+        if (mode === 'library' || mode === 'idle') {
+            dataService.getBooks().then(setBooks)
+            dataService.getConfig().then(setConfig)
+        }
+    }, [mode])
 
     const updateStatus = (msg: string, type: StatusType = 'processing') => {
         setStatus({ msg, type })
@@ -326,6 +338,17 @@ function MobileApp() {
             </header>
 
             <main className="mobile-content">
+                {mode === 'library' && (
+                    <LibraryView
+                        books={books}
+                        config={config}
+                        onUpdateBooks={setBooks}
+                        onUpdateConfig={setConfig}
+                        isMobile={true}
+                        onBack={() => setMode('idle')}
+                    />
+                )}
+
                 {mode === 'idle' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                         <button className="menu-card" onClick={() => startScanner(false)}>
@@ -343,7 +366,7 @@ function MobileApp() {
 
                         <button className="menu-card" onClick={() => startScanner(true)}>
                             <div className="menu-card-icon">
-                                <Library size={40} strokeWidth={1.5} />
+                                <Sparkles size={40} strokeWidth={1.5} />
                             </div>
                             <div className="menu-card-content">
                                 <span className="menu-card-title">Escanear varios libros</span>
@@ -393,6 +416,19 @@ function MobileApp() {
                                 <Search size={22} />
                             </button>
                         </div>
+
+                        <button className="menu-card" onClick={() => setMode('library')}>
+                            <div className="menu-card-icon">
+                                <Library size={40} strokeWidth={1.5} />
+                            </div>
+                            <div className="menu-card-content">
+                                <span className="menu-card-title">Ver BiBlion</span>
+                                <span className="menu-card-subtitle">Administra tu colección</span>
+                            </div>
+                            <div className="menu-card-chevron">
+                                <ChevronRight size={24} />
+                            </div>
+                        </button>
                     </div>
                 )}
 
@@ -493,8 +529,8 @@ function MobileApp() {
             </main>
 
             {/* Sticky Footer for Actions */}
-            {(mode === 'scanning' || mode === 'cropping' || mode === 'result') && (
-                <footer className="sticky-footer">
+            {(mode === 'scanning' || mode === 'cropping' || mode === 'result' && pendingBooks.length > 0) && (
+                <footer className="sticky-footer" style={{ padding: '0 15px' }}>
                     {mode === 'scanning' ? (
                         <>
                             {isBurstMode && pendingBooks.length > 0 && (

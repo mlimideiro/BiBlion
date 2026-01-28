@@ -7,10 +7,23 @@
     {
       "id": "1769470701100",
       "name": "Biblio Chica"
+    },
+    {
+      "id": "1769642202704",
+      "name": "Bibioteca Pasillo"
     }
   ],
   "activeLibraryId": "",
   "tags": [
-    "libro objeto"
+    "libro objeto",
+    "nuevos",
+    "tapa dura",
+    "sherlock",
+    "nordica",
+    "tapa blanca",
+    "virginia",
+    "vampiros",
+    "marcelo",
+    "preferidos"
   ]
 }

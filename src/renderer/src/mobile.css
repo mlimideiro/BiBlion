@@ -246,6 +246,22 @@ body {
     color: #444;
 }
 
+.modal-actions-header button.close-btn {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 10;
+}
+
 .search-btn {
     background: var(--mobile-accent);
     color: white;
@@ -272,7 +288,6 @@ body {
     border-top: 1px solid var(--card-border);
     padding: 10px 15px;
     display: flex;
-    gap: 12px;
     z-index: 150;
     align-items: center;
     box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
@@ -384,4 +399,296 @@ body {
 .zoom-control input {
     flex: 1;
     accent-color: var(--mobile-accent);
+}
+
+/* Library Layouts */
+.library-container.mobile {
+    padding-bottom: 40px;
+}
+
+/* Default mobile layout is GRID (2 columns) */
+.library-container.mobile .book-list {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    padding-top: 10px !important;
+}
+
+/* Base book item for mobile */
+.library-container.mobile .book-item {
+    background: var(--card-bg) !important;
+    border: 1px solid var(--card-border) !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    width: auto !important;
+}
+
+.library-container.mobile .book-cover {
+    width: 100% !important;
+    aspect-ratio: 2/3 !important;
+    background: #1a1a1a !important;
+    position: relative !important;
+    overflow: hidden !important;
+    height: auto !important;
+}
+
+.library-container.mobile .book-cover img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+}
+
+/* FULL MODE (1 column) */
+.library-container.mobile .book-list.mode-full {
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+}
+
+/* LIST MODE */
+.library-container.mobile .book-list.mode-list {
+    grid-template-columns: 1fr !important;
+}
+
+.library-container.mobile .book-list.mode-list .book-item {
+    flex-direction: row !important;
+    height: 100px !important;
+    align-items: center !important;
+}
+
+.library-container.mobile .book-list.mode-list .book-cover {
+    width: 70px !important;
+    height: 100% !important;
+    aspect-ratio: auto !important;
+    flex-shrink: 0 !important;
+}
+
+.library-container.mobile .book-list.mode-list .book-info {
+    padding: 10px 15px !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+.library-container.mobile .book-list.mode-list .book-info h3 {
+    font-size: 0.95rem;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Search Bar Mobile Overrides */
+.library-container.mobile .search-bar {
+    flex-direction: column !important;
+    gap: 15px !important;
+    margin-bottom: 25px !important;
+    width: 100% !important;
+    justify-content: center !important;
+}
+
+.library-container.mobile .search-input {
+    width: 100% !important;
+    max-width: none !important;
+    border-radius: 14px !important;
+    padding: 16px 20px !important;
+    /* Thicker input */
+    font-size: 1rem !important;
+    height: auto !important;
+}
+
+.size-selector-pills.mobile {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1fr !important;
+    padding: 4px !important;
+    border-radius: 14px !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.size-selector-pills.mobile .size-btn {
+    padding: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 10px !important;
+}
+
+/* Incomplete badge on mobile */
+.library-container.mobile .incomplete-badge {
+    bottom: 8px !important;
+    right: 8px !important;
+    padding: 3px 8px !important;
+    font-size: 0.7rem !important;
+}
+
+/* Tag Pills on Mobile */
+.library-container.mobile .tag-pills-container {
+    padding: 10px 0 25px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+    overflow-x: visible !important;
+    gap: 10px !important;
+}
+
+.library-container.mobile .tag-pill {
+    display: inline-flex !important;
+    width: auto !important;
+    padding: 10px 20px !important;
+    font-size: 0.95rem !important;
+    border-radius: 25px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: #94a3b8 !important;
+    transition: all 0.2s ease !important;
+    white-space: nowrap;
+}
+
+.library-container.mobile .tag-pill.active {
+    background: var(--mobile-accent) !important;
+    border-color: var(--mobile-accent) !important;
+    color: white !important;
+    box-shadow: 0 4px 15px rgba(139, 123, 168, 0.3) !important;
+}
+
+/* Library Selector Trigger */
+.library-selector-trigger {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 16px 20px;
+    border-radius: 14px;
+    margin-bottom: 20px;
+    cursor: pointer;
+}
+
+.trigger-label {
+    color: var(--mobile-text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.trigger-value {
+    color: white;
+    font-size: 1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Action Sheet Styles */
+.action-sheet-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.action-sheet {
+    background: #1c1b3d;
+    border-top-left-radius: 24px;
+    border-top-right-radius: 24px;
+    padding: 20px 20px 60px;
+    /* Even more bottom padding */
+    max-height: 65vh;
+    /* A bit shorter to ensure header is visible */
+    overflow-y: auto;
+    animation: slideUp 0.3s ease-out;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8);
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+.action-sheet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.action-sheet-header h3 {
+    margin: 0;
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.action-sheet-header button.action-sheet-close-btn {
+    background: var(--mobile-accent) !important;
+    border: none !important;
+    color: black !important;
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    opacity: 1 !important;
+    padding: 0 !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3) !important;
+}
+
+.action-sheet-header button.action-sheet-close-btn:active {
+    transform: scale(0.9) !important;
+}
+
+.action-sheet-header button.action-sheet-close-btn svg {
+    display: block !important;
+    stroke: black !important;
+}
+
+.action-sheet-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 20px;
+}
+
+.action-sheet-item {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 14px 18px;
+    /* Slightly thinner */
+    border-radius: 14px;
+    color: white;
+    font-size: 0.95rem;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+
+.action-sheet-item:active {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(0.98);
+}
+
+.action-sheet-item.active {
+    border-color: var(--mobile-accent);
+    background: rgba(139, 123, 168, 0.15);
+    font-weight: 500;
 }
