@@ -1,0 +1,9 @@
+services:
+  biblion:
+    build: .
+    container_name: biblion-app
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./db_biblion:/app/db_biblion
+    restart: always

@@ -9,8 +9,12 @@
     "description": "Es una de las creaciones poé ticas má s importantes del siglo xx. En esta obra, compuesta por dieciocho romances en los que prima un uso exquisito de la metá fora, se tratan temas universales como la muerte, el amor y la pasió n, todo ello con la cultura gitana como eje central. En é l se dan la mano tradició n y modernidad en un libro profundo, intenso, con una personalidad ú nica que se traduce en pura armoní a. Una obra maestra que sigue emocionando al lector como el primer dí a.",
     "coverPath": "https://books.google.com/books/content?id=41M70AEACAAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api",
     "createdAt": "2026-01-26T00:37:16.200Z",
-    "updatedAt": "2026-01-29T21:51:18.238Z",
-    "libraryId": "1769642202704"
+    "updatedAt": "2026-01-29T22:59:28.330Z",
+    "libraryId": "1769642202704",
+    "tags": [
+      "tapa blanca",
+      "preferidos"
+    ]
   },
   {
     "isbn": "9789500441643",
@@ -23,8 +27,12 @@
     "description": "\"Había empezado a meterse en el agua con sus botas de pescador cuando la vio. Estaba sentada sobre una piedra, comiéndose un pejerrey crudo, y no le molestó su presencia. No parecía muy joven pero ¿cómo se calcula la edad de una sirena?\" De la pareja de amantes que se reencuentra décadas después al pescador que escapa del agobio de una casa de vacaciones, pasando por la chica cuyo cuerpo sufre una extraña mutación cada vez que se siente en peligro, o por el abuelo que cava un misterioso túnel en la playa, los personajes de estos cuentos transitan un borde incierto entre la realidad y el asombro. Su lectura promete la revelación de un sentido que siempre se escapa y es apenas un aliciente más para avanzar. El amor, el miedo, la soledad, el sexo, la enfermedad, la muerte son algunos de los temas que Ana María Shua aborda con genialidad, con ironía, con compasión. Sirena de río es un conjunto de relatos agridulces, crueles y divertidos, en los que destaca un humor corrosivo y un uso preciso del lenguaje. Cada uno de ellos es una obra de arte en sí mismo. Juntos son una garantía de disfrute al tiempo que reafirman el lugar central de Ana María Shua en la literatura contemporánea en lengua española.",
     "coverPath": "https://books.google.com/books/content?id=MQKHEAAAQBAJ&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api",
     "createdAt": "2026-01-27T17:55:57.239Z",
-    "updatedAt": "2026-01-29T21:43:21.075Z",
-    "libraryId": "1769470701100"
+    "updatedAt": "2026-01-29T22:58:59.013Z",
+    "libraryId": "1769470701100",
+    "tags": [
+      "nordica",
+      "virginia"
+    ]
   },
   {
     "isbn": "9788494415883",
@@ -70,8 +78,11 @@
     "description": "\"Cuentos completos de Leonora Carrington reúne los relatos publicados en La casa del miedo, El séptimo caballo e incluye tres cuentos inéditos en español: \"El camello de arena\", \"El vuelo de Mr. Gregory\" y \"Jemima y el Lobo\". La recolección de estas historias en un solo tomo permite al lector adentrarse por completo en la imaginación de Leonora Carrington y fascinarse por sus historias fantásticas, el mundo onírico y su percepción de la realidad de forma macabra, satírica y brillante.\"",
     "coverPath": "",
     "createdAt": "2026-01-27T14:21:57.228Z",
-    "updatedAt": "2026-01-27T23:41:35.490Z",
-    "libraryId": "1769470701100"
+    "updatedAt": "2026-01-29T23:23:22.802Z",
+    "libraryId": "1769470701100",
+    "tags": [
+      "marcelo"
+    ]
   },
   {
     "isbn": "9788418227196",
@@ -83,9 +94,12 @@
     "pageCount": 34,
     "coverPath": "https://http2.mlstatic.com/D_NQ_NP_717257-MLA49411666946_032022-O.webp",
     "createdAt": "2026-01-27T14:21:57.268Z",
-    "updatedAt": "2026-01-28T23:17:00.036Z",
+    "updatedAt": "2026-01-29T23:54:40.892Z",
     "libraryId": "1769642202704",
-    "description": "Número de páginas: 464. | ISBN: 9788418227196."
+    "description": "Número de páginas: 464. | ISBN: 9788418227196.",
+    "tags": [
+      "nordica"
+    ]
   },
   {
     "isbn": "9789877693898",
@@ -124,8 +138,14 @@
     "authors": [],
     "coverPath": "http://dcdn-us.mitiendanube.com/stores/001/228/817/products/curriculum-vitae-muriel-spark1-a0268d3753057d705816677742829484-640-0.webp",
     "createdAt": "2026-01-28T00:02:53.302Z",
-    "updatedAt": "2026-01-29T21:43:41.699Z",
+    "updatedAt": "2026-01-29T22:38:40.055Z",
     "libraryId": "default",
-    "description": "Muriel Spark —autora de una gran imaginación novelística— decidió escribir su autobiografía sin contar nada que no pudiera probar documentalmente. No es just..."
+    "description": "Muriel Spark —autora de una gran imaginación novelística— decidió escribir su autobiografía sin contar nada que no pudiera probar documentalmente. No es just...",
+    "tags": [
+      "sherlock",
+      "marcelo",
+      "nuevos",
+      "preferidos"
+    ]
   }
 ]

@@ -859,8 +859,8 @@ body {
 }
 
 .library-container.mobile .modal-footer {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
+    display: flex !important;
+    justify-content: center !important;
     gap: 12px !important;
     padding-top: 15px !important;
     margin-top: 10px !important;
@@ -950,4 +950,54 @@ body {
     stroke-width: 4 !important;
     color: #000000 !important;
     overflow: visible !important;
+}
+
+/* Mobile Book Tags in Modal */
+.library-container.mobile .modal-tags-section {
+    margin-top: 12px !important;
+    padding-top: 12px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+.library-container.mobile .modal-tags-list {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin-top: 4px !important;
+}
+
+.library-container.mobile .modal-tag-pill {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 12px !important;
+    padding: 4px 8px 4px 12px !important;
+    font-size: 0.85rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    color: var(--mobile-text-secondary) !important;
+}
+
+.library-container.mobile .modal-tag-pill button {
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.library-container.mobile .modal-add-tag select {
+    background: transparent !important;
+    border: 1px dashed rgba(255, 255, 255, 0.3) !important;
+    color: var(--mobile-accent) !important;
+    border-radius: 12px !important;
+    padding: 4px 10px !important;
+    font-size: 0.85rem !important;
+    cursor: pointer !important;
+    outline: none !important;
 }

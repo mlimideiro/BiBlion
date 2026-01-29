@@ -124,6 +124,34 @@ export const LibraryView: React.FC<Props> = ({
         }
     }
 
+    const handleAddTagToBook = async (tag: string) => {
+        if (!selectedBook) return
+        const currentTags = selectedBook.tags || []
+        if (currentTags.includes(tag)) return
+
+        const updatedBook = { ...selectedBook, tags: [...currentTags, tag] }
+        try {
+            const updatedBooks = await dataService.saveBook(updatedBook)
+            onUpdateBooks(updatedBooks)
+            setSelectedBook(updatedBook)
+        } catch (e) {
+            console.error("Error adding tag", e)
+        }
+    }
+
+    const handleRemoveTagFromBook = async (tagToRemove: string) => {
+        if (!selectedBook) return
+        const currentTags = selectedBook.tags || []
+        const updatedBook = { ...selectedBook, tags: currentTags.filter(t => t !== tagToRemove) }
+        try {
+            const updatedBooks = await dataService.saveBook(updatedBook)
+            onUpdateBooks(updatedBooks)
+            setSelectedBook(updatedBook)
+        } catch (e) {
+            console.error("Error removing tag", e)
+        }
+    }
+
     return (
         <div className={`library-container ${isMobile ? 'mobile' : ''}`}>
 
@@ -226,6 +254,38 @@ export const LibraryView: React.FC<Props> = ({
                                             ))}
                                         </select>
                                     </div>
+
+                                    <div className="modal-tags-section">
+                                        <strong>Etiquetas:</strong>
+                                        <div className="modal-tags-list">
+                                            {selectedBook.tags?.map(tag => (
+                                                <span key={tag} className="modal-tag-pill">
+                                                    {tag}
+                                                    <button onClick={() => handleRemoveTagFromBook(tag)}>
+                                                        <X size={12} />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                            {config?.tags && config.tags.filter(t => !selectedBook.tags?.includes(t)).length > 0 && (
+                                                <div className="modal-add-tag">
+                                                    <select
+                                                        value=""
+                                                        onChange={(e) => {
+                                                            handleAddTagToBook(e.target.value)
+                                                            e.target.value = ""
+                                                        }}
+                                                    >
+                                                        <option value="" disabled>+ Agregar</option>
+                                                        {config.tags
+                                                            .filter(t => !selectedBook.tags?.includes(t))
+                                                            .map(tag => (
+                                                                <option key={tag} value={tag}>{tag}</option>
+                                                            ))}
+                                                    </select>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="modal-desc">
@@ -233,20 +293,24 @@ export const LibraryView: React.FC<Props> = ({
                                 </div>
 
                                 <div className="modal-footer">
-                                    <button className="action-btn" onClick={() => setIsEditingBook(!isEditingBook)}>
-                                        {isEditingBook ? 'Ver' : 'Editar'}
-                                    </button>
-                                    <button className="repair-btn" onClick={handleRepair} disabled={repairing}>
-                                        <Sparkles size={18} />
-                                        <span>
-                                            {repairing ? '...' : (
-                                                <>
-                                                    <div>Completar</div>
-                                                    <div>Datos</div>
-                                                </>
-                                            )}
-                                        </span>
-                                    </button>
+                                    {!isMobile && (
+                                        <>
+                                            <button className="action-btn" onClick={() => setIsEditingBook(!isEditingBook)}>
+                                                {isEditingBook ? 'Ver' : 'Editar'}
+                                            </button>
+                                            <button className="repair-btn" onClick={handleRepair} disabled={repairing}>
+                                                <Sparkles size={18} />
+                                                <span>
+                                                    {repairing ? '...' : (
+                                                        <>
+                                                            <div>Completar</div>
+                                                            <div>Datos</div>
+                                                        </>
+                                                    )}
+                                                </span>
+                                            </button>
+                                        </>
+                                    )}
                                     <button className="action-btn danger" onClick={handleDelete}>
                                         <Trash2 size={18} />
                                     </button>
