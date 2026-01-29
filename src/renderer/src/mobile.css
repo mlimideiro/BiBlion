@@ -27,6 +27,9 @@ body {
     background-attachment: fixed;
     display: block !important;
     width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
     font-family: 'Inter', -apple-system, sans-serif;
 }
 
@@ -40,6 +43,9 @@ body {
     flex-direction: column;
     color: var(--mobile-text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
 }
 
 /* Header */
@@ -456,6 +462,9 @@ body {
     flex-direction: row !important;
     height: 100px !important;
     align-items: center !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
 }
 
 .library-container.mobile .book-list.mode-list .book-cover {
@@ -477,6 +486,17 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    width: 100%;
+}
+
+.library-container.mobile .book-list.mode-list .book-info p {
+    font-size: 0.8rem;
+    color: var(--mobile-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    margin: 0;
 }
 
 /* Search Bar Mobile Overrides */
@@ -691,4 +711,206 @@ body {
     border-color: var(--mobile-accent);
     background: rgba(139, 123, 168, 0.15);
     font-weight: 500;
+}
+
+/* Mobile Book Details Modal Overrides */
+.library-container.mobile .modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.85) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    z-index: 9999 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    /* Stack from top as requested */
+    align-items: center !important;
+    padding: 15px !important;
+    padding-top: 5vh !important;
+}
+
+.library-container.mobile .modal-content {
+    width: 100% !important;
+    max-width: 450px !important;
+    max-height: 85vh !important;
+    background: #1c1b3d !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 24px !important;
+    margin: 0 !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8) !important;
+    overflow-y: auto !important;
+    animation: slideDownModal 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDownModal {
+    from {
+        transform: translateY(-30px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.library-container.mobile .modal-body {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 24px !important;
+    gap: 20px !important;
+    overflow-y: visible !important;
+}
+
+.library-container.mobile .modal-cover {
+    width: 180px !important;
+    height: 260px !important;
+    margin: 0 auto 5px !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(0, 0, 0, 0.2) !important;
+}
+
+.library-container.mobile .modal-cover img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+}
+
+.library-container.mobile .modal-info h2 {
+    font-size: 1.25rem !important;
+    text-align: center !important;
+    line-height: 1.3 !important;
+    margin-bottom: 5px !important;
+}
+
+.library-container.mobile .modal-author {
+    text-align: center !important;
+    font-size: 0.95rem !important;
+    margin-bottom: 20px !important;
+    color: var(--mobile-accent) !important;
+}
+
+.library-container.mobile .modal-meta {
+    background: rgba(255, 255, 255, 0.04) !important;
+    padding: 16px !important;
+    border-radius: 16px !important;
+    margin-bottom: 10px !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.library-container.mobile .modal-meta p {
+    font-size: 0.85rem !important;
+    margin-bottom: 6px !important;
+}
+
+.library-container.mobile .modal-desc {
+    font-size: 0.9rem !important;
+    line-height: 1.6 !important;
+    color: rgba(255, 255, 255, 0.8) !important;
+    padding: 0 5px !important;
+}
+
+.library-container.mobile .modal-footer {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    padding-top: 15px !important;
+    margin-top: 10px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.library-container.mobile .modal-footer button {
+    width: 100% !important;
+    height: 48px !important;
+    border-radius: 14px !important;
+    font-weight: 600 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+}
+
+.library-container.mobile .modal-footer button.repair-btn {
+    font-size: 0.8rem !important;
+    line-height: 1.2 !important;
+    padding: 0 5px !important;
+}
+
+.library-container.mobile .modal-footer button.repair-btn span {
+    text-align: center !important;
+}
+
+.library-container.mobile .modal-footer button.danger {
+    grid-column: span 2 !important;
+    font-size: 0.95rem !important;
+}
+
+.library-container.mobile .repair-btn {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    padding: 0 10px !important;
+}
+
+.library-container.mobile .repair-btn svg {
+    flex-shrink: 0 !important;
+}
+
+.library-container.mobile .repair-btn span {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    /* Changed from flex-start to center */
+    justify-content: center !important;
+    font-size: 0.8rem !important;
+    line-height: 1.1 !important;
+    text-align: center !important;
+    margin: 0 !important;
+}
+
+.library-container.mobile .modal-actions-header {
+    padding: 15px !important;
+    position: sticky !important;
+    top: 0 !important;
+    background: #1c1b3d !important;
+    z-index: 10 !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+}
+
+.library-container.mobile .modal-actions-header button.close-btn {
+    background: var(--mobile-accent) !important;
+    border: none !important;
+    color: black !important;
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3) !important;
+}
+
+.library-container.mobile .modal-actions-header button.close-btn svg {
+    display: block !important;
+    width: 28px !important;
+    height: 28px !important;
+    stroke: #000000 !important;
+    stroke-width: 4 !important;
+    color: #000000 !important;
+    overflow: visible !important;
 }

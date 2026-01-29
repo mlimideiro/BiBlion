@@ -235,7 +235,14 @@ export const LibraryView: React.FC<Props> = ({
                                     </button>
                                     <button className="repair-btn" onClick={handleRepair} disabled={repairing}>
                                         <Sparkles size={18} />
-                                        <span>{repairing ? '...' : 'Completar Datos'}</span>
+                                        <span>
+                                            {repairing ? '...' : (
+                                                <>
+                                                    <div>Completar</div>
+                                                    <div>Datos</div>
+                                                </>
+                                            )}
+                                        </span>
                                     </button>
                                     <button className="action-btn danger" onClick={handleDelete}>
                                         <Trash2 size={18} />
