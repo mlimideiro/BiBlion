@@ -1,4 +1,4 @@
-# BiBlion
+# BiBlion - Admin your library
 
 Aplicación de escritorio para gestión de biblioteca personal con escáner móvil integrado.
 
