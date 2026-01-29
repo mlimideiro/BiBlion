@@ -332,7 +332,7 @@ function MobileApp() {
                 {status.msg}
             </div>
 
-            <header className="mobile-header">
+            <header className="mobile-header" onClick={() => setMode('idle')}>
                 <img src={logo} alt="BiBlion" />
                 <h1>BiBlion Móvil</h1>
             </header>

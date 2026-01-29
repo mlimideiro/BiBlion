@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
-    "dev:electron": "wait-on tcp:5173 && tsc -p tsconfig.node.json && electron .",
+    "dev:electron": "wait-on tcp:5173 && nodemon --watch src/main --ext ts --exec \"tsc -p tsconfig.node.json && electron .\"",
     "build": "tsc -p tsconfig.node.json && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
@@ -37,6 +37,7 @@
     "concurrently": "^8.2.2",
     "electron": "^29.1.0",
     "electron-builder": "^24.13.3",
+    "nodemon": "^3.1.11",
     "typescript": "^5.3.3",
     "vite": "^5.1.4",
     "wait-on": "^7.2.0"

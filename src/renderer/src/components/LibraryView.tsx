@@ -112,30 +112,20 @@ export const LibraryView: React.FC<Props> = ({
         }
     }
 
+    const handleLibraryChange = async (libraryId: string) => {
+        if (!selectedBook) return
+        const updatedBook = { ...selectedBook, libraryId }
+        try {
+            const updatedBooks = await dataService.saveBook(updatedBook)
+            onUpdateBooks(updatedBooks)
+            setSelectedBook(updatedBook)
+        } catch (e) {
+            console.error("Error updating library", e)
+        }
+    }
+
     return (
         <div className={`library-container ${isMobile ? 'mobile' : ''}`}>
-            {isMobile && onBack && (
-                <button
-                    onClick={onBack}
-                    style={{
-                        background: 'rgba(255,255,255,0.05)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        color: 'white',
-                        padding: '10px 15px',
-                        borderRadius: '12px',
-                        marginBottom: '15px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        width: 'fit-content',
-                        fontSize: '0.9rem',
-                        fontWeight: 500
-                    }}
-                >
-                    <ChevronRight size={18} style={{ transform: 'rotate(180deg)' }} />
-                    Volver al Inicio
-                </button>
-            )}
 
             {isMobile && config && (
                 <div
@@ -223,6 +213,19 @@ export const LibraryView: React.FC<Props> = ({
                                     <p><strong>ISBN:</strong> {selectedBook.isbn}</p>
                                     {selectedBook.publisher && <p><strong>Editorial:</strong> {selectedBook.publisher}</p>}
                                     {selectedBook.pageCount && <p><strong>Páginas:</strong> {selectedBook.pageCount}</p>}
+
+                                    <div className="modal-library-select">
+                                        <strong>Biblioteca:</strong>
+                                        <select
+                                            value={selectedBook.libraryId || ""}
+                                            onChange={(e) => handleLibraryChange(e.target.value)}
+                                        >
+                                            <option value="">Sin Asignar</option>
+                                            {config?.libraries.map(lib => (
+                                                <option key={lib.id} value={lib.id}>{lib.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
 
                                 <div className="modal-desc">

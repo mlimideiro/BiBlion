@@ -43,8 +43,8 @@ export const dataService = {
         if (isElectron) {
             return window.electron.deleteBook(isbn)
         }
-        // Delete not yet implemented via API
-        return null
+        const res = await axios.delete(`${API_BASE}/books/${isbn}`)
+        return res.data
     },
 
     async bulkSaveBooks(books: Book[]): Promise<Book[]> {

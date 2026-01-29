@@ -73,7 +73,22 @@ export function startServer(dataManager: DataManager, metadataService: MetadataS
         dataManager.saveBook(newBook)
         onBookUpdate(newBook)
 
-        res.json({ success: true, book: newBook })
+        // Return ALL books to match Electron behavior and update frontend state
+        const allBooks = dataManager.getAllBooks()
+        res.json(allBooks)
+    })
+
+    app.delete('/api/books/:isbn', (req, res) => {
+        const { isbn } = req.params
+        console.log('Deleting book:', isbn)
+        const success = dataManager.deleteBook(isbn)
+
+        if (success) {
+            const allBooks = dataManager.getAllBooks()
+            res.json(allBooks)
+        } else {
+            res.status(404).json({ error: 'Book not found' })
+        }
     })
 
     app.post('/api/config', (req, res) => {
