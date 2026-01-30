@@ -350,7 +350,7 @@ function MobileApp() {
                 )}
 
                 {mode === 'idle' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div className="mobile-idle-container">
                         <button className="menu-card" onClick={() => startScanner(false)}>
                             <div className="menu-card-icon">
                                 <ScanBarcode size={40} strokeWidth={1.5} />

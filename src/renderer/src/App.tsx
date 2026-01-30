@@ -371,22 +371,24 @@ function App() {
                 />
 
                 {config && config.tags.length > 0 && (
-                    <div className="tag-pills-container">
-                        <div
-                            className={`tag-pill ${selectedTag === null ? 'active' : ''}`}
-                            onClick={() => setSelectedTag(null)}
-                        >
-                            Todos
-                        </div>
-                        {config.tags.map(tag => (
+                    <div className="tags-carousel-wrapper">
+                        <div className="tag-pills-container">
                             <div
-                                key={tag}
-                                className={`tag-pill ${selectedTag === tag ? 'active' : ''}`}
-                                onClick={() => setSelectedTag(tag)}
+                                className={`tag-pill ${selectedTag === null ? 'active' : ''}`}
+                                onClick={() => setSelectedTag(null)}
                             >
-                                {tag}
+                                Todos
                             </div>
-                        ))}
+                            {config.tags.map(tag => (
+                                <div
+                                    key={tag}
+                                    className={`tag-pill ${selectedTag === tag ? 'active' : ''}`}
+                                    onClick={() => setSelectedTag(tag)}
+                                >
+                                    {tag}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
 

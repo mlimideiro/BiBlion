@@ -28,7 +28,8 @@ body {
     display: block !important;
     width: 100% !important;
     min-width: 100% !important;
-    max-width: 100% !important;
+    max-width: 100vw !important;
+    /* Force viewport width */
     overflow-x: hidden !important;
     font-family: 'Inter', -apple-system, sans-serif;
 }
@@ -435,7 +436,22 @@ body {
     display: flex !important;
     flex-direction: column !important;
     height: auto !important;
-    width: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+.library-container.mobile .book-info {
+    padding: 10px !important;
+    min-width: 0 !important;
+}
+
+.library-container.mobile .book-info h3,
+.library-container.mobile .book-info p {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    width: 100% !important;
+    margin: 0 !important;
 }
 
 .library-container.mobile .book-cover {
@@ -459,9 +475,55 @@ body {
     gap: 15px !important;
 }
 
+/* Main content constraints */
+.mobile-content {
+    flex: 1;
+    padding: 0 !important;
+    /* Let children handle padding */
+    padding-bottom: calc(var(--footer-h) + 20px) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+
+.mobile-idle-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 15px;
+}
+
 /* LIST MODE */
+.library-container.mobile {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Ensure Search Bar has padding on mobile library view */
+.library-container.mobile .search-bar {
+    padding: 20px 15px 10px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+}
+
 .library-container.mobile .book-list.mode-list {
-    grid-template-columns: 1fr !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    /* CRITICAL: Force shrink */
+    width: 100% !important;
+    padding: 10px 15px !important;
+    box-sizing: border-box !important;
+    gap: 12px !important;
+}
+
+/* Constrain the auto-generated wrapper div from LibraryView.tsx */
+.library-container.mobile .book-list.mode-list>div {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    width: 100% !important;
 }
 
 .library-container.mobile .book-list.mode-list .book-item {
@@ -471,6 +533,9 @@ body {
     width: 100% !important;
     max-width: 100% !important;
     overflow: hidden !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    border-radius: 12px !important;
 }
 
 .library-container.mobile .book-list.mode-list .book-cover {
@@ -484,6 +549,10 @@ body {
     padding: 10px 15px !important;
     flex: 1 !important;
     min-width: 0 !important;
+    /* CRITICAL: Allows title to truncate */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .library-container.mobile .book-list.mode-list .book-info h3 {
@@ -509,6 +578,7 @@ body {
 .library-container.mobile .search-bar {
     flex-direction: column !important;
     gap: 15px !important;
+    margin: 0 auto !important;
     margin-bottom: 25px !important;
     width: 100% !important;
     justify-content: center !important;
@@ -550,18 +620,34 @@ body {
 }
 
 /* Tag Pills on Mobile */
+/* Tag Pills on Mobile - Allow carousel from components.css */
+.library-container.mobile .tags-carousel-wrapper {
+    margin: 5px 0 15px !important;
+    mask-image: linear-gradient(to right, black 85%, transparent 100%) !important;
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%) !important;
+}
+
 .library-container.mobile .tag-pills-container {
-    padding: 10px 0 25px !important;
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: wrap !important;
+    padding: 10px 15px 25px !important;
+    /* Side padding on mobile */
+    display: grid !important;
+    grid-template-rows: repeat(2, auto) !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: max-content !important;
     justify-content: flex-start !important;
-    overflow-x: visible !important;
+    overflow-x: auto !important;
     gap: 10px !important;
+    scrollbar-width: none !important;
+}
+
+.library-container.mobile .tag-pills-container::-webkit-scrollbar {
+    display: none !important;
 }
 
 .library-container.mobile .tag-pill {
     display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     width: auto !important;
     padding: 10px 20px !important;
     font-size: 0.95rem !important;
@@ -571,6 +657,7 @@ body {
     color: #94a3b8 !important;
     transition: all 0.2s ease !important;
     white-space: nowrap;
+    text-align: center !important;
 }
 
 .library-container.mobile .tag-pill.active {
