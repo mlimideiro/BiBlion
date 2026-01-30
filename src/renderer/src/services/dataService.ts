@@ -51,30 +51,33 @@ export const dataService = {
         if (isElectron) {
             return window.electron.bulkSaveBooks(books)
         }
-        // Bulk save not yet implemented via API
-        return []
+        const res = await axios.post(`${API_BASE}/bulk-save`, books)
+        return res.data
     },
 
     async bulkDeleteBooks(isbns: string[]): Promise<Book[]> {
         if (isElectron) {
             return window.electron.bulkDeleteBooks(isbns)
         }
-        // Bulk delete not yet implemented via API
-        return []
+        const res = await axios.post(`${API_BASE}/bulk-delete`, isbns)
+        return res.data
     },
 
     async repairMetadata(isbn: string) {
         if (isElectron) {
             return window.electron.repairMetadata(isbn)
         }
-        return null // Repair usually happens on PC
+        // Metadata repair is essentially lookup on the API
+        const res = await axios.get(`${API_BASE}/lookup/${isbn}`)
+        return res.data
     },
 
     async scrapeMetadata(url: string) {
         if (isElectron) {
             return window.electron.scrapeMetadata(url)
         }
-        return null // Scrape usually happens on PC
+        const res = await axios.get(`${API_BASE}/scrape`, { params: { url } })
+        return res.data
     },
 
     getCoverUrl(book: Book): string {

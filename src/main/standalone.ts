@@ -6,14 +6,14 @@ import { ScraperService } from './scraperService'
 // Initialize core services
 const dataManager = new DataManager()
 const metadataService = new MetadataService()
-const _scraperService = new ScraperService() // Currently used in desktop IPC, keeping for future parity
+const scraperService = new ScraperService()
 
 console.log('--- BiBlion Cloud Server ---')
 console.log('Initializing services...')
 
 // Start the Express server
 // In standalone mode, we don't need to notify a desktop window
-startServer(dataManager, metadataService, (newBook) => {
+startServer(dataManager, metadataService, scraperService, (newBook) => {
     console.log(`[Update] Book processed via mobile/API: ${newBook.title}`)
 })
 

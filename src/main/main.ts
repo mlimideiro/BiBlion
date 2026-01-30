@@ -34,7 +34,7 @@ app.whenReady().then(() => {
     createWindow()
 
     // Start Server
-    const serverInfo = startServer(dataManager, metadataService, (newBook) => {
+    const serverInfo = startServer(dataManager, metadataService, scraperService, (newBook) => {
         // Notify desktop when a book is added/updated from mobile
         mainWindow?.webContents.send('books-updated', dataManager.getAllBooks())
     })

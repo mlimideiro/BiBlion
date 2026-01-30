@@ -5,8 +5,14 @@ import fs from 'fs'
 import ip from 'ip'
 import { DataManager, Book } from './dataManager'
 import { MetadataService } from './metadataService'
+import { ScraperService } from './scraperService'
 
-export function startServer(dataManager: DataManager, metadataService: MetadataService, onBookUpdate: (book: Book) => void) {
+export function startServer(
+    dataManager: DataManager,
+    metadataService: MetadataService,
+    scraperService: ScraperService,
+    onBookUpdate: (book: Book) => void
+) {
     const app = express()
     const PORT = 3000
 
@@ -21,6 +27,11 @@ export function startServer(dataManager: DataManager, metadataService: MetadataS
     // Explicitly serve mobile.html for root request
     app.get('/', (_req, res) => {
         res.sendFile(path.join(staticPath, 'mobile.html'))
+    })
+
+    // Route for the full desktop management view
+    app.get('/desktop', (_req, res) => {
+        res.sendFile(path.join(staticPath, 'index.html'))
     })
 
     // Explicit fallback for /mobile.html if requested directly
@@ -78,6 +89,20 @@ export function startServer(dataManager: DataManager, metadataService: MetadataS
         res.json(allBooks)
     })
 
+    app.post('/api/bulk-save', (req, res) => {
+        const books: Book[] = req.body
+        console.log('Bulk saving books:', books.length)
+        dataManager.saveBooks(books)
+        res.json(dataManager.getAllBooks())
+    })
+
+    app.post('/api/bulk-delete', (req, res) => {
+        const isbns: string[] = req.body
+        console.log('Bulk deleting books:', isbns.length)
+        dataManager.deleteBooks(isbns)
+        res.json(dataManager.getAllBooks())
+    })
+
     app.delete('/api/books/:isbn', (req, res) => {
         const { isbn } = req.params
         console.log('Deleting book:', isbn)
@@ -93,9 +118,17 @@ export function startServer(dataManager: DataManager, metadataService: MetadataS
 
     app.post('/api/config', (req, res) => {
         const configData = req.body
-        console.log('Updating config from mobile')
+        console.log('Updating config from mobile/web')
         dataManager.saveConfig(configData)
         res.json({ success: true })
+    })
+
+    app.get('/api/scrape', async (req, res) => {
+        const { url } = req.query
+        if (!url) return res.status(400).json({ error: 'URL is required' })
+        console.log('Scraping URL:', url)
+        const result = await scraperService.scrape(url as string)
+        res.json(result)
     })
 
     app.listen(PORT, '0.0.0.0', () => {
