@@ -16,8 +16,29 @@ export function startServer(
     const app = express()
     const PORT = 3000
 
-    app.use(cors())
     app.use(express.json())
+    app.use(cors())
+
+    const USERS_FILE = path.join(process.cwd(), 'db_biblion', 'users.json')
+
+    app.post('/api/login', (req, res) => {
+        const { username, password } = req.body
+        try {
+            if (!fs.existsSync(USERS_FILE)) {
+                return res.status(500).json({ error: 'Configuración de usuarios no encontrada' })
+            }
+            const users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'))
+            const user = users.find((u: any) => u.username === username && u.password === password)
+
+            if (user) {
+                res.json({ success: true, username: user.username })
+            } else {
+                res.status(401).json({ success: false, error: 'Usuario o contraseña incorrectos' })
+            }
+        } catch (error) {
+            res.status(500).json({ error: 'Error en el servidor' })
+        }
+    })
 
     const staticPath = path.join(__dirname, '../renderer')
 

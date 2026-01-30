@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
+import fs from 'fs'
 import { DataManager } from './dataManager'
 import { startServer } from './server'
 import { MetadataService } from './metadataService'
@@ -34,7 +35,7 @@ app.whenReady().then(() => {
     createWindow()
 
     // Start Server
-    const serverInfo = startServer(dataManager, metadataService, scraperService, (newBook) => {
+    const serverInfo = startServer(dataManager, metadataService, scraperService, () => {
         // Notify desktop when a book is added/updated from mobile
         mainWindow?.webContents.send('books-updated', dataManager.getAllBooks())
     })
@@ -77,6 +78,24 @@ app.whenReady().then(() => {
     ipcMain.handle('scrape-metadata', async (_event, url) => {
         const result = await scraperService.scrape(url)
         return result
+    })
+
+    ipcMain.handle('login', async (_event, { username, password }) => {
+        try {
+            const USERS_FILE = path.join(process.cwd(), 'db_biblion', 'users.json')
+            if (!fs.existsSync(USERS_FILE)) {
+                return { success: false, error: 'Configuración no encontrada' }
+            }
+            const fs_extra = require('fs-extra')
+            const users = fs_extra.readJsonSync(USERS_FILE)
+            const user = users.find((u: any) => u.username === username && u.password === password)
+            if (user) {
+                return { success: true, username: user.username }
+            }
+            return { success: false, error: 'Usuario o contraseña incorrectos' }
+        } catch (e) {
+            return { success: false, error: 'Error de servidor' }
+        }
     })
 
     app.on('activate', () => {

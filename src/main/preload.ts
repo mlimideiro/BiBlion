@@ -16,7 +16,8 @@ contextBridge.exposeInMainWorld('electron', {
 
     // Metadata Repair
     repairMetadata: (isbn: string) => ipcRenderer.invoke('repair-metadata', isbn),
-    scrapeMetadata: (url: string) => ipcRenderer.invoke('scrape-metadata', url)
+    scrapeMetadata: (url: string) => ipcRenderer.invoke('scrape-metadata', url),
+    login: (credentials: any) => ipcRenderer.invoke('login', credentials)
 })
 
 // Preload script

@@ -5,6 +5,7 @@ export interface Book {
     publisher?: string
     description?: string
     coverPath?: string
+    coverUrl?: string
     pageCount?: number
     libraryId?: string
     tags?: string[]

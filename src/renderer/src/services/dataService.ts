@@ -81,15 +81,22 @@ export const dataService = {
     },
 
     getCoverUrl(book: Book): string {
-        if (!book.coverPath) return ''
-        if (book.coverPath.startsWith('http')) return book.coverPath
+        // 1. If we have a local path...
+        if (book.coverPath) {
+            // Already a remote URL?
+            if (book.coverPath.startsWith('http')) return book.coverPath
 
-        if (isElectron) {
-            return `file://${book.coverPath}`
+            // Local file in Electron
+            if (isElectron) return `file://${book.coverPath}`
+
+            // Local file in Web via API
+            const filename = book.coverPath.split(/[\\/]/).pop()
+            return `${API_BASE}/covers/${filename}`
         }
 
-        // For mobile, we serve local covers via a specific endpoint
-        const filename = book.coverPath.split(/[\\/]/).pop()
-        return `${API_BASE}/covers/${filename}`
+        // 2. Fallback to remote URL if available
+        if (book.coverUrl) return book.coverUrl
+
+        return ''
     }
 }

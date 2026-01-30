@@ -10,6 +10,7 @@ import logo from './assets/logo.png'
 import { LibraryView } from './components/LibraryView'
 import { Book, Config } from './types'
 import { dataService } from './services/dataService'
+import { Login } from './components/Login'
 
 interface BookMetadata {
     isbn: string
@@ -24,8 +25,10 @@ interface BookMetadata {
 
 type StatusType = 'idle' | 'success' | 'processing' | 'error' | 'warning'
 
-function MobileApp() {
+const MobileApp: React.FC = () => {
+    // Mode management
     const [mode, setMode] = useState<'idle' | 'scanning' | 'cropping' | 'processing' | 'result' | 'library'>('idle')
+    const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('biblion_user'))
     const [books, setBooks] = useState<Book[]>([])
     const [config, setConfig] = useState<Config | null>(null)
     const [isBurstMode, setIsBurstMode] = useState(false)
@@ -326,8 +329,12 @@ function MobileApp() {
         }
     }
 
+    if (!isLoggedIn) {
+        return <Login onLogin={() => setIsLoggedIn(true)} />
+    }
+
     return (
-        <div className="mobile-container">
+        <div className="mobile-app">
             <div className={`status-bar ${status.type}`}>
                 {status.msg}
             </div>
@@ -529,41 +536,43 @@ function MobileApp() {
             </main>
 
             {/* Sticky Footer for Actions */}
-            {(mode === 'scanning' || mode === 'cropping' || mode === 'result' && pendingBooks.length > 0) && (
-                <footer className="sticky-footer" style={{ padding: '0 15px' }}>
-                    {mode === 'scanning' ? (
-                        <>
-                            {isBurstMode && pendingBooks.length > 0 && (
-                                <button onClick={() => { scannerRef.current?.stop().then(() => setMode('result')) }} className="mobile-btn btn-success" style={{ flex: 2 }}>
-                                    <Sparkles size={18} /> Revisar ({pendingBooks.length})
+            {
+                (mode === 'scanning' || mode === 'cropping' || mode === 'result' && pendingBooks.length > 0) && (
+                    <footer className="sticky-footer" style={{ padding: '0 15px' }}>
+                        {mode === 'scanning' ? (
+                            <>
+                                {isBurstMode && pendingBooks.length > 0 && (
+                                    <button onClick={() => { scannerRef.current?.stop().then(() => setMode('result')) }} className="mobile-btn btn-success" style={{ flex: 2 }}>
+                                        <Sparkles size={18} /> Revisar ({pendingBooks.length})
+                                    </button>
+                                )}
+                                <button onClick={stopScanning} className="mobile-btn btn-danger" style={{ flex: 1 }}>
+                                    <X size={18} /> Detener
                                 </button>
-                            )}
-                            <button onClick={stopScanning} className="mobile-btn btn-danger" style={{ flex: 1 }}>
-                                <X size={18} /> Detener
-                            </button>
-                        </>
-                    ) : mode === 'cropping' ? (
-                        <>
-                            <button onClick={handleCropComplete} className="mobile-btn btn-success" style={{ flex: 1 }}>
-                                Confirmar
-                            </button>
-                            <button onClick={() => setMode('idle')} className="mobile-btn btn-secondary" style={{ flex: 1 }}>
-                                Cancelar
-                            </button>
-                        </>
-                    ) : mode === 'result' ? (
-                        <>
-                            <button onClick={handleConfirm} className="mobile-btn btn-success" style={{ flex: 2 }}>
-                                Guardar Todo
-                            </button>
-                            <button onClick={() => setMode('idle')} className="mobile-btn btn-secondary" style={{ flex: 1 }}>
-                                Cancelar
-                            </button>
-                        </>
-                    ) : null}
-                </footer>
-            )}
-        </div>
+                            </>
+                        ) : mode === 'cropping' ? (
+                            <>
+                                <button onClick={handleCropComplete} className="mobile-btn btn-success" style={{ flex: 1 }}>
+                                    Confirmar
+                                </button>
+                                <button onClick={() => setMode('idle')} className="mobile-btn btn-secondary" style={{ flex: 1 }}>
+                                    Cancelar
+                                </button>
+                            </>
+                        ) : mode === 'result' ? (
+                            <>
+                                <button onClick={handleConfirm} className="mobile-btn btn-success" style={{ flex: 2 }}>
+                                    Guardar Todo
+                                </button>
+                                <button onClick={() => setMode('idle')} className="mobile-btn btn-secondary" style={{ flex: 1 }}>
+                                    Cancelar
+                                </button>
+                            </>
+                        ) : null}
+                    </footer>
+                )
+            }
+        </div >
     )
 }
 

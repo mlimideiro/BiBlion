@@ -27,7 +27,7 @@ export const BookListItem: React.FC<Props> = ({
                         </div>
                     </div>
                 )}
-                {book.coverPath ? (
+                {(book.coverPath || book.coverUrl) ? (
                     <img
                         src={dataService.getCoverUrl(book)}
                         alt={book.title}
@@ -35,7 +35,7 @@ export const BookListItem: React.FC<Props> = ({
                 ) : (
                     <div className="placeholder-cover">Sin Tapa</div>
                 )}
-                {(!book.coverPath || book.authors.length === 0) && (
+                {(!book.coverPath && !book.coverUrl || book.authors.length === 0) && (
                     <div className="incomplete-badge">Incompleto</div>
                 )}
             </div>

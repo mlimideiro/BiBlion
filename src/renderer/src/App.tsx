@@ -8,9 +8,12 @@ import { Book, Config, Library } from './types'
 import './index.css'
 import './components/components.css'
 import logo from './assets/logo.png'
+import { Login } from './components/Login'
+
 function App() {
     const [books, setBooks] = useState<Book[]>([])
     const [config, setConfig] = useState<Config | null>(null)
+    const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('biblion_user'))
     const [filteredBooks, setFilteredBooks] = useState<Book[]>([])
     const [serverInfo, setServerInfo] = useState<{ ip: string; port: number } | null>(null)
     const [menuOpen, setMenuOpen] = useState(false)
@@ -292,6 +295,10 @@ function App() {
         } catch (e) {
             alert("Error al capturar datos: " + (e as Error).message)
         }
+    }
+
+    if (!isLoggedIn) {
+        return <Login onLogin={() => setIsLoggedIn(true)} />
     }
 
     return (

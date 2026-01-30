@@ -228,7 +228,7 @@ export const LibraryView: React.FC<Props> = ({
 
                         <div className="modal-body">
                             <div className="modal-cover">
-                                {selectedBook.coverPath ? (
+                                {(selectedBook.coverPath || selectedBook.coverUrl) ? (
                                     <img src={dataService.getCoverUrl(selectedBook)} alt={selectedBook.title} />
                                 ) : (
                                     <div className="placeholder-cover">Sin Tapa</div>
