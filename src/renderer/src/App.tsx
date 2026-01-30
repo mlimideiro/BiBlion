@@ -15,7 +15,6 @@ function App() {
     const [config, setConfig] = useState<Config | null>(null)
     const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('biblion_user'))
     const [filteredBooks, setFilteredBooks] = useState<Book[]>([])
-    const [serverInfo, setServerInfo] = useState<{ ip: string; port: number } | null>(null)
     const [menuOpen, setMenuOpen] = useState(false)
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -42,7 +41,6 @@ function App() {
     useEffect(() => {
         // Initial fetch
         dataService.getBooks().then(setBooks)
-        window.electron?.getServerInfo().then(setServerInfo)
         dataService.getConfig().then(setConfig)
 
         // Listen for updates
@@ -152,7 +150,7 @@ function App() {
         setMenuOpen(false)
     }
 
-    const mobileUrl = serverInfo ? `http://${serverInfo.ip}:${serverInfo.port}` : 'Cargando...'
+    const mobileUrl = 'https://biblion-app.duckdns.org'
 
     const toggleSelectionMode = () => {
         setIsSelectionMode(!isSelectionMode)
