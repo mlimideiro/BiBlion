@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import MobileApp from './MobileApp'
 import './index.css'
+import './components/components.css'
 
 // CRITICAL ERROR HANDLER
 window.onerror = function (message, source, lineno, colno, error) {

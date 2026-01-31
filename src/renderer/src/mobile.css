@@ -29,8 +29,11 @@ body {
     width: 100% !important;
     min-width: 100% !important;
     max-width: 100vw !important;
-    /* Force viewport width */
+    /* Force scrolling and override components.css */
+    overflow-y: auto !important;
     overflow-x: hidden !important;
+    height: auto !important;
+    min-height: 100vh !important;
     font-family: 'Inter', -apple-system, sans-serif;
 }
 
@@ -38,6 +41,7 @@ body {
     width: 100%;
 }
 
+.mobile-app,
 .mobile-container {
     min-height: 100vh;
     display: flex;
@@ -46,6 +50,7 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     width: 100% !important;
     max-width: 100% !important;
+    overflow-y: auto !important;
     overflow-x: hidden !important;
 }
 
@@ -123,10 +128,14 @@ body {
 
 /* Main Content Area */
 .mobile-content {
-    flex: 1;
+    flex: 1 0 auto;
+    /* Allow growth and don't shrink */
+    width: 100% !important;
     padding: 15px;
-    padding-bottom: calc(var(--footer-h) + 20px);
-    /* Leave room for sticky footer */
+    padding-bottom: calc(var(--footer-h) + 100px) !important;
+    /* Extra space to ensure bottom visibility */
+    overflow-y: visible !important;
+    /* Let body handle the scroll */
 }
 
 /* Forms & Buttons */
@@ -416,15 +425,59 @@ body {
 
 /* Library Layouts */
 .library-container.mobile {
-    padding-bottom: 40px;
+    padding-bottom: 20px;
+    width: 100% !important;
+    overflow: visible !important;
 }
 
 /* Default mobile layout is GRID (2 columns) */
 .library-container.mobile .book-list {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
+    gap: 15px !important;
+    padding: 10px 15px !important;
+}
+
+/* GRID MODE SPECIFIC (2 columns with portrait covers) */
+.library-container.mobile .book-list.mode-grid {
+    grid-template-columns: 1fr 1fr !important;
     gap: 12px !important;
-    padding-top: 10px !important;
+    padding: 10px !important;
+}
+
+/* Ensure grid children (wrapper divs) don't force full width */
+.library-container.mobile .book-list.mode-grid>div {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+.library-container.mobile .book-list.mode-grid .book-item {
+    padding: 0 !important;
+    width: 100% !important;
+}
+
+.library-container.mobile .book-list.mode-grid .book-cover {
+    height: 270px !important;
+    width: 100% !important;
+}
+
+.library-container.mobile .book-list.mode-grid .book-cover img {
+    object-fit: cover !important;
+}
+
+.library-container.mobile .book-list.mode-grid .book-info {
+    padding: 6px 8px !important;
+}
+
+.library-container.mobile .book-list.mode-grid .book-info h3 {
+    font-size: 0.85rem !important;
+    line-height: 1.2 !important;
+}
+
+.library-container.mobile .book-list.mode-grid .book-info p {
+    font-size: 0.75rem !important;
+    line-height: 1.1 !important;
 }
 
 /* Base book item for mobile */
@@ -456,11 +509,14 @@ body {
 
 .library-container.mobile .book-cover {
     width: 100% !important;
-    aspect-ratio: 2/3 !important;
     background: #1a1a1a !important;
     position: relative !important;
     overflow: hidden !important;
-    height: auto !important;
+}
+
+/* Fixed height for list and full modes, but NOT grid */
+.library-container.mobile .book-list:not(.mode-grid) .book-cover {
+    height: 200px !important;
 }
 
 .library-container.mobile .book-cover img {
@@ -472,7 +528,43 @@ body {
 /* FULL MODE (1 column) */
 .library-container.mobile .book-list.mode-full {
     grid-template-columns: 1fr !important;
-    gap: 15px !important;
+    gap: 20px !important;
+    padding: 10px 15px !important;
+}
+
+.library-container.mobile .book-list.mode-full .book-item {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.library-container.mobile .book-list.mode-full .book-cover {
+    max-height: 400px !important;
+    border-radius: 16px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+    margin-bottom: 12px !important;
+}
+
+.library-container.mobile .book-list.mode-full .book-cover img {
+    object-fit: contain !important;
+}
+
+.library-container.mobile .book-list.mode-full .book-info {
+    text-align: center !important;
+    padding: 0 10px !important;
+}
+
+.library-container.mobile .book-list.mode-full .book-info h3 {
+    font-size: 1.2rem !important;
+    white-space: normal !important;
+    line-height: 1.3 !important;
+}
+
+.library-container.mobile .book-list.mode-full .book-info p {
+    font-size: 1rem !important;
+    color: var(--mobile-accent) !important;
+    overflow: visible !important;
+    white-space: normal !important;
 }
 
 /* Main content constraints */
@@ -539,10 +631,12 @@ body {
 }
 
 .library-container.mobile .book-list.mode-list .book-cover {
-    width: 70px !important;
-    height: 100% !important;
+    width: 60px !important;
+    height: 80px !important;
     aspect-ratio: auto !important;
     flex-shrink: 0 !important;
+    border-radius: 6px !important;
+    margin: 10px !important;
 }
 
 .library-container.mobile .book-list.mode-list .book-info {
