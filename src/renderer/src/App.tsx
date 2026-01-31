@@ -122,7 +122,8 @@ function App() {
     const handleSwitchLibrary = async (libId: string) => {
         if (!config) return
         const newConfig = { ...config, activeLibraryId: libId }
-        dataService.saveConfig(newConfig).then(setConfig)
+        await dataService.saveConfig(newConfig)
+        setConfig(newConfig)
     }
 
     const handleSaveLibraries = (libs: Library[], tags: string[]) => {
@@ -629,7 +630,7 @@ function App() {
                                                 </div>
                                             )}
 
-                                            <div className="modal-footer" style={{ border: 'none', padding: '20px 0 0 0', marginTop: 'auto' }}>
+                                            <div className="modal-footer" style={{ border: 'none', padding: '20px 0 20px 0', marginTop: 'auto' }}>
                                                 <button className="repair-btn" onClick={handleRepair} disabled={repairing}>
                                                     <Sparkles size={18} />
                                                     <span>{repairing ? 'Buscando...' : 'Completar Datos'}</span>

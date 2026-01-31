@@ -1072,6 +1072,9 @@ body {
 .library-container.mobile .modal-footer button.danger {
     grid-column: span 2 !important;
     font-size: 0.95rem !important;
+    width: 60% !important;
+    /* Users asked for half size, 60% looks slightly better than 50% for touch targets, but can adjust */
+    margin: 0 auto !important;
 }
 
 .library-container.mobile .repair-btn {
