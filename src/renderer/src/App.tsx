@@ -9,11 +9,13 @@ import './index.css'
 import './components/components.css'
 import logo from './assets/logo.png'
 import { Login } from './components/Login'
+import { AdminDashboard } from './components/AdminDashboard'
 
 function App() {
     const [books, setBooks] = useState<Book[]>([])
     const [config, setConfig] = useState<Config | null>(null)
     const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('biblion_user'))
+    const [isSuperAdmin, setIsSuperAdmin] = useState(localStorage.getItem('biblion_role') === 'admin')
     const [filteredBooks, setFilteredBooks] = useState<Book[]>([])
     const [menuOpen, setMenuOpen] = useState(false)
     const [settingsOpen, setSettingsOpen] = useState(false)
@@ -296,8 +298,33 @@ function App() {
         }
     }
 
+    const handleLogin = (username: string, isAdmin: boolean) => {
+        setIsLoggedIn(true)
+        if (isAdmin) {
+            setIsSuperAdmin(true)
+            localStorage.setItem('biblion_role', 'admin')
+            localStorage.setItem('biblion_is_admin', 'true')
+        } else {
+            setIsSuperAdmin(false)
+            localStorage.removeItem('biblion_role')
+            localStorage.removeItem('biblion_is_admin')
+        }
+    }
+
+    const handleLogout = () => {
+        localStorage.removeItem('biblion_user')
+        localStorage.removeItem('biblion_role')
+        localStorage.removeItem('biblion_is_admin')
+        setIsLoggedIn(false)
+        setIsSuperAdmin(false)
+    }
+
     if (!isLoggedIn) {
-        return <Login onLogin={() => setIsLoggedIn(true)} />
+        return <Login onLogin={handleLogin} />
+    }
+
+    if (isSuperAdmin) {
+        return <AdminDashboard onLogout={handleLogout} />
     }
 
     return (

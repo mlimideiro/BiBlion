@@ -17,7 +17,11 @@ contextBridge.exposeInMainWorld('electron', {
     // Metadata Repair
     repairMetadata: (isbn: string) => ipcRenderer.invoke('repair-metadata', isbn),
     scrapeMetadata: (url: string) => ipcRenderer.invoke('scrape-metadata', url),
-    login: (credentials: any) => ipcRenderer.invoke('login', credentials)
+    login: (credentials: any) => ipcRenderer.invoke('login', credentials),
+    getUsers: () => ipcRenderer.invoke('get-users'),
+    createUser: (user: any) => ipcRenderer.invoke('create-user', user),
+    updateUser: (user: any) => ipcRenderer.invoke('update-user', user),
+    deleteUser: (user: any) => ipcRenderer.invoke('delete-user', user)
 })
 
 // Preload script
