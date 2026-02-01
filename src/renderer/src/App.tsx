@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { BookListItem } from './components/BookListItem'
 import { SearchBar } from './components/SearchBar'
-import { Trash2, LayoutGrid, Settings, Download, X, Sparkles } from 'lucide-react'
+import { Trash2, LayoutGrid, Settings, Download, X, Sparkles, User } from 'lucide-react'
 import { SettingsModal } from './components/SettingsModal'
 import { dataService } from './services/dataService'
 import { Book, Config, Library } from './types'
@@ -345,9 +345,15 @@ function App() {
         <div className="container">
             <header className="app-header">
                 <div className="header-top">
-                    <div className="brand">
+                    <div className="brand" style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                         <img src={logo} alt="Logo" style={{ width: 45, height: 45, borderRadius: 8 }} />
-                        <h1>BiBlion</h1>
+                        <h1 style={{ margin: '0 15px 0 10px', whiteSpace: 'nowrap' }}>BiBlion</h1>
+                        {currentUser && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+                                <User size={20} color="#cdd6f4" />
+                                <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#cdd6f4' }}>{currentUser}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -384,6 +390,7 @@ function App() {
                             <span style={{ marginRight: 8 }}>📲</span>
                             Escanea desde: <a href={mobileUrl} target="_blank" className="mobile-link">{mobileUrl}</a>
                         </div>
+
 
                         <div className="settings-container" ref={menuRef}>
                             <button

@@ -5,7 +5,7 @@ import Tesseract from 'tesseract.js'
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
 import './mobile.css'
-import { ScanBarcode, Library, Image as ImageIcon, Camera, Search, ChevronRight, X, Sparkles } from 'lucide-react'
+import { ScanBarcode, Library, Image as ImageIcon, Camera, Search, ChevronRight, X, Sparkles, User } from 'lucide-react'
 import logo from './assets/logo.png'
 import { LibraryView } from './components/LibraryView'
 import { Book, Config } from './types'
@@ -345,9 +345,18 @@ const MobileApp: React.FC = () => {
             </div>
 
             <header className="mobile-header" onClick={() => setMode('idle')}>
-                <img src={logo} alt="BiBlion" />
-                <h1>BiBlion Móvil</h1>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                    <img src={logo} alt="BiBlion" style={{ width: '50px', height: '50px' }} />
+                    <h1>BiBlion Móvil</h1>
+                </div>
             </header>
+
+            {currentUser && mode === 'idle' && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#cdd6f4', marginTop: '8px', marginBottom: '-5px' }}>
+                    <User size={24} />
+                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', lineHeight: '1' }}>{currentUser}</span>
+                </div>
+            )}
 
             <main className="mobile-content">
                 {mode === 'library' && (
