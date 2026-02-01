@@ -14,7 +14,8 @@ import { AdminDashboard } from './components/AdminDashboard'
 function App() {
     const [books, setBooks] = useState<Book[]>([])
     const [config, setConfig] = useState<Config | null>(null)
-    const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('biblion_user'))
+    const [currentUser, setCurrentUser] = useState<string | null>(localStorage.getItem('biblion_user'))
+    const [isLoggedIn, setIsLoggedIn] = useState(!!currentUser)
     const [isSuperAdmin, setIsSuperAdmin] = useState(localStorage.getItem('biblion_role') === 'admin')
     const [filteredBooks, setFilteredBooks] = useState<Book[]>([])
     const [menuOpen, setMenuOpen] = useState(false)
@@ -42,21 +43,31 @@ function App() {
 
     useEffect(() => {
         // Initial fetch
-        dataService.getBooks().then(setBooks)
-        dataService.getConfig().then(setConfig)
+        if (currentUser) {
+            dataService.getBooks(currentUser).then(setBooks)
+            dataService.getConfig(currentUser).then(setConfig)
+        }
 
         // Listen for updates
-        window.electron?.onUpdate((_event: any, updatedBooks: Book[]) => {
-            setBooks(updatedBooks)
-            // Update selectedBook if it's currently open to reflect latest DB changes
-            setSelectedBook(prev => {
-                if (!prev) return null
-                const updated = updatedBooks.find(b => b.isbn === prev.isbn)
-                return updated || null
-            })
+        window.electron?.onUpdate((data: any) => {
+            // Check if update is for current user
+            // data format: { username, books } or just books (legacy)
+            // If data is array, it's legacy (or from fallback). 
+            // BUT main.ts now sends { username, books }
+            if (data.username && data.username === currentUser) {
+                setBooks(data.books)
+                // Update selectedBook if it's currently open to reflect latest DB changes
+                setSelectedBook(prev => {
+                    if (!prev) return null
+                    const updated = data.books.find((b: Book) => b.isbn === prev.isbn)
+                    return updated || null
+                })
+            }
         })
 
-        window.electron?.onConfigUpdate((_event: any, updatedConfig: Config) => {
+        window.electron?.onConfigUpdate((updatedConfig: Config) => {
+            // Config update usually triggered by ourselves or mobile for same user
+            // Ideally this should also carry username, but for now assuming valid
             setConfig(updatedConfig)
         })
 
@@ -122,20 +133,21 @@ function App() {
     }, [thumbnailSize])
 
     const handleSwitchLibrary = async (libId: string) => {
-        if (!config) return
+        if (!config || !currentUser) return
         const newConfig = { ...config, activeLibraryId: libId }
-        await dataService.saveConfig(newConfig)
+        await dataService.saveConfig(newConfig, currentUser)
         setConfig(newConfig)
     }
 
-    const handleSaveLibraries = (libs: Library[], tags: string[]) => {
-        if (!config) return
+    const handleSaveLibraries = async (libs: Library[], tags: string[]) => {
+        if (!config || !currentUser) return
         const newConfig = { ...config, libraries: libs, tags: tags }
         // If active library was deleted, fallback to default
         if (!libs.find(l => l.id === newConfig.activeLibraryId)) {
             newConfig.activeLibraryId = 'default'
         }
-        window.electron.saveConfig(newConfig).then(setConfig)
+        await dataService.saveConfig(newConfig, currentUser)
+        setConfig(newConfig)
         setSettingsOpen(false)
     }
 
@@ -169,10 +181,10 @@ function App() {
     }
 
     const handleBulkDelete = async () => {
-        if (selectedIsbns.length === 0) return
+        if (selectedIsbns.length === 0 || !currentUser) return
         if (confirm(`¿Estás seguro de eliminar ${selectedIsbns.length} libros?`)) {
             try {
-                const updatedBooks = await dataService.bulkDeleteBooks(selectedIsbns)
+                const updatedBooks = await dataService.bulkDeleteBooks(selectedIsbns, currentUser)
                 setBooks(updatedBooks)
                 setSelectedIsbns([])
                 setIsSelectionMode(false)
@@ -183,13 +195,13 @@ function App() {
     }
 
     const handleBulkMove = async (libraryId: string) => {
-        if (selectedIsbns.length === 0) return
+        if (selectedIsbns.length === 0 || !currentUser) return
         try {
             const booksToUpdate = books
                 .filter(b => selectedIsbns.includes(b.isbn))
                 .map(b => ({ ...b, libraryId }))
 
-            const updatedBooks = await dataService.bulkSaveBooks(booksToUpdate)
+            const updatedBooks = await dataService.bulkSaveBooks(booksToUpdate, currentUser)
             setBooks(updatedBooks)
             setSelectedIsbns([])
             setIsSelectionMode(false)
@@ -203,10 +215,10 @@ function App() {
     const [repairing, setRepairing] = useState(false)
 
     const handleDelete = async () => {
-        if (!selectedBook) return
+        if (!selectedBook || !currentUser) return
         if (confirm('¿Estás seguro de eliminar este libro?')) {
             try {
-                const updatedBooks = await dataService.deleteBook(selectedBook.isbn)
+                const updatedBooks = await dataService.deleteBook(selectedBook.isbn, currentUser)
                 setBooks(updatedBooks)
                 setSelectedBook(null)
             } catch (e) {
@@ -223,7 +235,7 @@ function App() {
             const data = await dataService.repairMetadata(selectedBook.isbn)
             if (data) {
                 const updatedBook = { ...selectedBook, ...data }
-                const updatedBooks = await dataService.saveBook(updatedBook)
+                const updatedBooks = await dataService.saveBook(updatedBook, currentUser || undefined)
                 setBooks(updatedBooks)
                 setSelectedBook(updatedBook)
                 alert("¡Datos actualizados!")
@@ -238,37 +250,37 @@ function App() {
     }
 
     const handleMoveLibrary = async (libraryId: string) => {
-        if (!selectedBook) return
+        if (!selectedBook || !currentUser) return
         const updatedBook = { ...selectedBook, libraryId }
-        const updatedBooks = await dataService.saveBook(updatedBook)
+        const updatedBooks = await dataService.saveBook(updatedBook, currentUser)
         setBooks(updatedBooks)
         setSelectedBook(updatedBook)
     }
 
     const handleAddTagToBook = async (tagName: string) => {
-        if (!selectedBook) return
+        if (!selectedBook || !currentUser) return
         const currentTags = selectedBook.tags || []
         if (currentTags.includes(tagName)) return
         const updatedBook = { ...selectedBook, tags: [...currentTags, tagName] }
-        const updatedBooks = await dataService.saveBook(updatedBook)
+        const updatedBooks = await dataService.saveBook(updatedBook, currentUser)
         setBooks(updatedBooks)
         setSelectedBook(updatedBook)
     }
 
     const handleRemoveTagFromBook = async (tagName: string) => {
-        if (!selectedBook) return
+        if (!selectedBook || !currentUser) return
         const currentTags = selectedBook.tags || []
         const updatedBook = { ...selectedBook, tags: currentTags.filter(t => t !== tagName) }
-        const updatedBooks = await dataService.saveBook(updatedBook)
+        const updatedBooks = await dataService.saveBook(updatedBook, currentUser)
         setBooks(updatedBooks)
         setSelectedBook(updatedBook)
     }
 
     const handleEditSave = async (updatedData: Partial<Book>) => {
-        if (!selectedBook) return
+        if (!selectedBook || !currentUser) return
         try {
             const updatedBook = { ...selectedBook, ...updatedData }
-            const updatedBooks = await dataService.saveBook(updatedBook)
+            const updatedBooks = await dataService.saveBook(updatedBook, currentUser)
             setBooks(updatedBooks)
             setSelectedBook(updatedBook)
             setIsEditingBook(false)
@@ -278,13 +290,13 @@ function App() {
     }
 
     const handleScrape = async () => {
-        if (!scraperUrl) return
+        if (!scraperUrl || !currentUser) return
         try {
             const data = await dataService.scrapeMetadata(scraperUrl)
             if (data && selectedBook) {
                 const updatedBook = { ...selectedBook, ...data }
                 // Persist the changes immediately
-                const updatedBooks = await dataService.saveBook(updatedBook)
+                const updatedBooks = await dataService.saveBook(updatedBook, currentUser)
                 setBooks(updatedBooks)
                 setSelectedBook(updatedBook)
                 setScraperUrl('')
@@ -299,6 +311,7 @@ function App() {
     }
 
     const handleLogin = (username: string, isAdmin: boolean) => {
+        setCurrentUser(username)
         setIsLoggedIn(true)
         if (isAdmin) {
             setIsSuperAdmin(true)
@@ -315,6 +328,7 @@ function App() {
         localStorage.removeItem('biblion_user')
         localStorage.removeItem('biblion_role')
         localStorage.removeItem('biblion_is_admin')
+        setCurrentUser(null)
         setIsLoggedIn(false)
         setIsSuperAdmin(false)
     }

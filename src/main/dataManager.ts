@@ -32,42 +32,77 @@ export interface Config {
 }
 
 const DB_PATH = 'db_biblion'
-const DB_FILE = path.join(DB_PATH, 'books.json')
-const CONFIG_FILE = path.join(DB_PATH, 'config.json')
+// Legacy paths
+const LEGACY_DB_FILE = path.join(DB_PATH, 'books.json')
+const LEGACY_CONFIG_FILE = path.join(DB_PATH, 'config.json')
+
 const BACKUP_DIR = path.join(DB_PATH, 'backups')
 const COVERS_DIR = path.join(DB_PATH, 'covers')
 
+const LEGACY_USERS = ['marce', 'jush']
+
 export class DataManager {
     constructor() {
-        this.ensureDbStructure()
+        this.ensureStructure()
     }
 
     private normalizeIsbn(isbn: string): string {
         return isbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
     }
 
-    private ensureDbStructure() {
+    private ensureStructure() {
         fs.ensureDirSync(DB_PATH)
         fs.ensureDirSync(BACKUP_DIR)
         fs.ensureDirSync(COVERS_DIR)
 
-        if (!fs.existsSync(DB_FILE)) {
-            fs.writeJsonSync(DB_FILE, [])
+        // Ensure legacy files exist just in case
+        if (!fs.existsSync(LEGACY_DB_FILE)) {
+            fs.writeJsonSync(LEGACY_DB_FILE, [])
         }
-
-        if (!fs.existsSync(CONFIG_FILE)) {
-            const defaultConfig: Config = {
-                libraries: [{ id: 'default', name: 'Principal' }],
-                activeLibraryId: 'default',
-                tags: []
-            }
-            fs.writeJsonSync(CONFIG_FILE, defaultConfig)
+        if (!fs.existsSync(LEGACY_CONFIG_FILE)) {
+            this.writeDefaultConfig(LEGACY_CONFIG_FILE)
         }
     }
 
-    public getConfig(): Config {
+    private writeDefaultConfig(configPath: string) {
+        const defaultConfig: Config = {
+            libraries: [{ id: 'default', name: 'Principal' }],
+            activeLibraryId: 'default',
+            tags: []
+        }
+        fs.writeJsonSync(configPath, defaultConfig)
+    }
+
+    // Helper to get paths based on user
+    private getUserPaths(username: string) {
+        // Legacy check
+        if (!username || LEGACY_USERS.includes(username)) {
+            return {
+                books: LEGACY_DB_FILE,
+                config: LEGACY_CONFIG_FILE
+            }
+        }
+
+        // New user isolation
+        const userDir = path.join(DB_PATH, 'users', username)
+        fs.ensureDirSync(userDir)
+        const booksFile = path.join(userDir, 'books.json')
+        const configFile = path.join(userDir, 'config.json')
+
+        // Init if not exists
+        if (!fs.existsSync(booksFile)) fs.writeJsonSync(booksFile, [])
+        if (!fs.existsSync(configFile)) this.writeDefaultConfig(configFile)
+
+        return {
+            books: booksFile,
+            config: configFile
+        }
+    }
+
+    public getConfig(username: string): Config {
         try {
-            const config = fs.readJsonSync(CONFIG_FILE)
+            const { config: configFile } = this.getUserPaths(username)
+            const config = fs.readJsonSync(configFile)
             if (!config.tags) config.tags = []
             return config
         } catch (e) {
@@ -75,34 +110,36 @@ export class DataManager {
         }
     }
 
-    public saveConfig(config: Config) {
-        fs.writeJsonSync(CONFIG_FILE, config, { spaces: 2 })
+    public saveConfig(username: string, config: Config) {
+        const { config: configFile } = this.getUserPaths(username)
+        fs.writeJsonSync(configFile, config, { spaces: 2 })
     }
 
-    public getAllBooks(): Book[] {
+    public getAllBooks(username: string): Book[] {
         try {
-            return fs.readJsonSync(DB_FILE) as Book[]
+            const { books: booksFile } = this.getUserPaths(username)
+            return fs.readJsonSync(booksFile) as Book[]
         } catch (error) {
             console.error('Error reading DB:', error)
             return []
         }
     }
 
-    public saveBook(book: Book) {
-        const books = this.getAllBooks()
+    public saveBook(username: string, book: Book) {
+        const { books: booksFile } = this.getUserPaths(username)
+        const books = this.getAllBooks(username)
+
         const normalizedIsbn = this.normalizeIsbn(book.isbn)
         const index = books.findIndex(b => this.normalizeIsbn(b.isbn) === normalizedIsbn)
 
-        console.log(`[DataManager] Saving book: "${book.title}" (ISBN: ${book.isbn}, Normalized: ${normalizedIsbn})`)
-        console.log(`[DataManager] Existing index: ${index}`)
+        console.log(`[DataManager] Saving book for ${username}: "${book.title}"`)
 
-        // Create Backup
-        this.createBackup(books)
+        // Create Backup (Global backup logic for simplicity, could be per user but sticking to simple)
+        this.createBackup(books, username)
 
         if (index >= 0) {
             // Update
             const existingBook = books[index]
-            console.log(`[DataManager] Updating existing book in library: ${existingBook.libraryId}`)
             books[index] = {
                 ...existingBook,
                 ...book,
@@ -114,25 +151,21 @@ export class DataManager {
             }
         } else {
             // New
-            console.log(`[DataManager] Creating new book as UNASSIGNED`)
             const newBook = { ...book }
-            newBook.isbn = normalizedIsbn // Store normalized
+            newBook.isbn = normalizedIsbn
             newBook.createdAt = new Date().toISOString()
             newBook.updatedAt = newBook.createdAt
-
-            // CRITICAL: New books always go to "unassigned" regardless of active library
-            newBook.libraryId = ""
-
+            newBook.libraryId = "" // Default to unassigned
             books.push(newBook)
         }
 
-        fs.writeJsonSync(DB_FILE, books, { spaces: 2 })
+        fs.writeJsonSync(booksFile, books, { spaces: 2 })
     }
 
-    public deleteBook(isbn: string) {
-        const books = this.getAllBooks()
+    public deleteBook(username: string, isbn: string) {
+        const { books: booksFile } = this.getUserPaths(username)
+        const books = this.getAllBooks(username)
         const targetIsbn = this.normalizeIsbn(isbn)
-        console.log(`[DataManager] Deleting book: ${isbn} (Normalized: ${targetIsbn})`)
 
         const filteredBooks = books.filter(b => {
             const normalized = this.normalizeIsbn(b.isbn)
@@ -140,26 +173,23 @@ export class DataManager {
         })
 
         if (filteredBooks.length !== books.length) {
-            console.log(`[DataManager] Deleted successfully. New count: ${filteredBooks.length}`)
-            this.createBackup(books)
-            fs.writeJsonSync(DB_FILE, filteredBooks, { spaces: 2 })
+            this.createBackup(books, username)
+            fs.writeJsonSync(booksFile, filteredBooks, { spaces: 2 })
             return true
         }
-        console.warn(`[DataManager] Delete FAILED: ISBN not found among ${books.length} books.`)
         return false
     }
 
-    public saveBooks(booksToSave: Book[]) {
-        const books = this.getAllBooks()
-        // Create Backup
-        this.createBackup(books)
+    public saveBooks(username: string, booksToSave: Book[]) {
+        const { books: booksFile } = this.getUserPaths(username)
+        const books = this.getAllBooks(username)
+        this.createBackup(books, username)
 
         let changed = false
         booksToSave.forEach(book => {
             const normalizedIsbn = this.normalizeIsbn(book.isbn)
             const index = books.findIndex(b => this.normalizeIsbn(b.isbn) === normalizedIsbn)
             if (index >= 0) {
-                // Update: preserve library and tags if not explicitly provided in the update
                 const existing = books[index]
                 books[index] = {
                     ...existing,
@@ -179,27 +209,28 @@ export class DataManager {
         })
 
         if (changed) {
-            fs.writeJsonSync(DB_FILE, books, { spaces: 2 })
+            fs.writeJsonSync(booksFile, books, { spaces: 2 })
         }
         return books
     }
 
-    public deleteBooks(isbns: string[]) {
-        const books = this.getAllBooks()
+    public deleteBooks(username: string, isbns: string[]) {
+        const { books: booksFile } = this.getUserPaths(username)
+        const books = this.getAllBooks(username)
         const targetIsbns = isbns.map(id => this.normalizeIsbn(id))
         const filteredBooks = books.filter(b => !targetIsbns.includes(this.normalizeIsbn(b.isbn)))
 
         if (filteredBooks.length !== books.length) {
-            this.createBackup(books)
-            fs.writeJsonSync(DB_FILE, filteredBooks, { spaces: 2 })
+            this.createBackup(books, username)
+            fs.writeJsonSync(booksFile, filteredBooks, { spaces: 2 })
             return filteredBooks
         }
         return books
     }
 
-    private createBackup(books: Book[]) {
+    private createBackup(books: Book[], username: string) {
         const date = new Date().toISOString().split('T')[0]
-        const backupFile = path.join(BACKUP_DIR, `books.backup-${date}.json`)
+        const backupFile = path.join(BACKUP_DIR, `books_${username}_${date}.json`)
         fs.writeJsonSync(backupFile, books, { spaces: 2 })
     }
 }

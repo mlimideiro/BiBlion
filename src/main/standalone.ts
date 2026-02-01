@@ -13,8 +13,8 @@ console.log('Initializing services...')
 
 // Start the Express server
 // In standalone mode, we don't need to notify a desktop window
-startServer(dataManager, metadataService, scraperService, (newBook) => {
-    console.log(`[Update] Book processed via mobile/API: ${newBook.title}`)
+startServer(dataManager, metadataService, scraperService, (username, newBook) => {
+    console.log(`[Update] Book processed via mobile/API for user ${username}: ${newBook.title}`)
 })
 
 console.log('Ready for connections.')

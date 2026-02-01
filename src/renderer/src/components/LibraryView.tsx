@@ -12,6 +12,7 @@ interface Props {
     onUpdateConfig?: (config: Config) => void
     isMobile?: boolean
     onBack?: () => void
+    currentUser?: string | null
 }
 
 export const LibraryView: React.FC<Props> = ({
@@ -20,7 +21,8 @@ export const LibraryView: React.FC<Props> = ({
     onUpdateBooks,
     onUpdateConfig,
     isMobile = false,
-    onBack
+    onBack,
+    currentUser
 }) => {
     const [filteredBooks, setFilteredBooks] = useState<Book[]>([])
     const [thumbnailSize, setThumbnailSize] = useState<'S' | 'M' | 'L' | 'XL'>(
@@ -92,7 +94,7 @@ export const LibraryView: React.FC<Props> = ({
             const data = await dataService.repairMetadata(selectedBook.isbn)
             if (data) {
                 const updatedBook = { ...selectedBook, ...data }
-                const updatedBooks = await dataService.saveBook(updatedBook)
+                const updatedBooks = await dataService.saveBook(updatedBook, currentUser || undefined)
                 onUpdateBooks(updatedBooks)
                 setSelectedBook(updatedBook)
             }
@@ -106,7 +108,7 @@ export const LibraryView: React.FC<Props> = ({
     const handleDelete = async () => {
         if (!selectedBook) return
         if (window.confirm('¿Eliminar libro?')) {
-            const updatedBooks = await dataService.deleteBook(selectedBook.isbn)
+            const updatedBooks = await dataService.deleteBook(selectedBook.isbn, currentUser || undefined)
             onUpdateBooks(updatedBooks)
             setSelectedBook(null)
         }
@@ -116,7 +118,7 @@ export const LibraryView: React.FC<Props> = ({
         if (!selectedBook) return
         const updatedBook = { ...selectedBook, libraryId }
         try {
-            const updatedBooks = await dataService.saveBook(updatedBook)
+            const updatedBooks = await dataService.saveBook(updatedBook, currentUser || undefined)
             onUpdateBooks(updatedBooks)
             setSelectedBook(updatedBook)
         } catch (e) {
@@ -131,7 +133,7 @@ export const LibraryView: React.FC<Props> = ({
 
         const updatedBook = { ...selectedBook, tags: [...currentTags, tag] }
         try {
-            const updatedBooks = await dataService.saveBook(updatedBook)
+            const updatedBooks = await dataService.saveBook(updatedBook, currentUser || undefined)
             onUpdateBooks(updatedBooks)
             setSelectedBook(updatedBook)
         } catch (e) {
@@ -144,7 +146,7 @@ export const LibraryView: React.FC<Props> = ({
         const currentTags = selectedBook.tags || []
         const updatedBook = { ...selectedBook, tags: currentTags.filter(t => t !== tagToRemove) }
         try {
-            const updatedBooks = await dataService.saveBook(updatedBook)
+            const updatedBooks = await dataService.saveBook(updatedBook, currentUser || undefined)
             onUpdateBooks(updatedBooks)
             setSelectedBook(updatedBook)
         } catch (e) {
@@ -338,7 +340,7 @@ export const LibraryView: React.FC<Props> = ({
                                 onClick={async () => {
                                     if (!config) return
                                     const newConfig = { ...config, activeLibraryId: "" }
-                                    await dataService.saveConfig(newConfig)
+                                    await dataService.saveConfig(newConfig, currentUser || undefined)
                                     onUpdateConfig?.(newConfig)
                                     setIsLibrarySelectorOpen(false)
                                 }}
@@ -351,7 +353,7 @@ export const LibraryView: React.FC<Props> = ({
                                 onClick={async () => {
                                     if (!config) return
                                     const newConfig = { ...config, activeLibraryId: 'unassigned' }
-                                    await dataService.saveConfig(newConfig)
+                                    await dataService.saveConfig(newConfig, currentUser || undefined)
                                     onUpdateConfig?.(newConfig)
                                     setIsLibrarySelectorOpen(false)
                                 }}
@@ -365,7 +367,7 @@ export const LibraryView: React.FC<Props> = ({
                                     className={`action-sheet-item ${config.activeLibraryId === lib.id ? 'active' : ''}`}
                                     onClick={async () => {
                                         const newConfig = { ...config, activeLibraryId: lib.id }
-                                        await dataService.saveConfig(newConfig)
+                                        await dataService.saveConfig(newConfig, currentUser || undefined)
                                         onUpdateConfig?.(newConfig)
                                         setIsLibrarySelectorOpen(false)
                                     }}

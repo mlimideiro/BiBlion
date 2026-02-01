@@ -11,7 +11,7 @@ export function startServer(
     dataManager: DataManager,
     metadataService: MetadataService,
     scraperService: ScraperService,
-    onBookUpdate: (book: Book) => void
+    onBookUpdate: (username: string, book: Book) => void
 ) {
     const app = express()
     const PORT = 3000
@@ -67,13 +67,15 @@ export function startServer(
         res.sendFile(path.join(staticPath, 'mobile.html'))
     })
 
-    app.get('/api/books', (_req, res) => {
-        const books = dataManager.getAllBooks()
+    app.get('/api/books', (req, res) => {
+        const { username } = req.query
+        const books = dataManager.getAllBooks(username as string)
         res.json(books)
     })
 
-    app.get('/api/config', (_req, res) => {
-        const config = dataManager.getConfig()
+    app.get('/api/config', (req, res) => {
+        const { username } = req.query
+        const config = dataManager.getConfig(username as string)
         res.json(config)
     })
 
@@ -99,8 +101,8 @@ export function startServer(
     })
 
     app.post('/api/save', (req, res) => {
-        const bookData = req.body
-        console.log('Saving book:', bookData.title)
+        const { username, ...bookData } = req.body
+        console.log('Saving book:', bookData.title, 'for user:', username)
 
         // If it's a full book object from the library view, it might have libraryId and tags
         const newBook: Book = {
@@ -109,35 +111,57 @@ export function startServer(
             updatedAt: new Date().toISOString()
         }
 
-        dataManager.saveBook(newBook)
-        onBookUpdate(newBook)
+        dataManager.saveBook(username, newBook)
+        onBookUpdate(username, newBook)
 
         // Return ALL books to match Electron behavior and update frontend state
-        const allBooks = dataManager.getAllBooks()
+        const allBooks = dataManager.getAllBooks(username)
         res.json(allBooks)
     })
 
     app.post('/api/bulk-save', (req, res) => {
-        const books: Book[] = req.body
-        console.log('Bulk saving books:', books.length)
-        dataManager.saveBooks(books)
-        res.json(dataManager.getAllBooks())
+        const { username, books } = req.body // Expecting { username, books: [] } or array? Frontend sends array usually? 
+        // Logic check: Frontend usually sends just body. Need to check dataService.
+        // Assuming dataService will be updated to wrap body in {username, ...} or I check if body is array.
+        // If body is array, it's legacy/no-username? No, dataService needs update.
+        // Let's assume body is { username, books: [...] }
+
+        console.log('Bulk saving books:', books?.length)
+        if (username && books) {
+            dataManager.saveBooks(username, books)
+            res.json(dataManager.getAllBooks(username))
+        } else {
+            // Fallback for legacy array
+            // const books = req.body
+            // ... legacy handling is tricky here if structure changes. 
+            // Let's assume frontend is updated to send object.
+            res.status(400).json({ error: "Invalid format" })
+        }
     })
 
     app.post('/api/bulk-delete', (req, res) => {
-        const isbns: string[] = req.body
-        console.log('Bulk deleting books:', isbns.length)
-        dataManager.deleteBooks(isbns)
-        res.json(dataManager.getAllBooks())
+        const { username, isbns } = req.body
+        console.log('Bulk deleting books:', isbns?.length)
+        if (username && isbns) {
+            dataManager.deleteBooks(username, isbns)
+            res.json(dataManager.getAllBooks(username))
+        } else {
+            res.status(400).json({ error: "Invalid format" })
+        }
     })
 
     app.delete('/api/books/:isbn', (req, res) => {
         const { isbn } = req.params
-        console.log('Deleting book:', isbn)
-        const success = dataManager.deleteBook(isbn)
+        const { username } = req.body // Delete usually doesn't have body in some clients, but axios does. Query valid too.
+        // Better use query for delete if body is unreliable? 
+        // Let's try to get from query or body.
+        const user = req.body.username || req.query.username
+
+        console.log('Deleting book:', isbn, 'user:', user)
+        const success = dataManager.deleteBook(user, isbn)
 
         if (success) {
-            const allBooks = dataManager.getAllBooks()
+            const allBooks = dataManager.getAllBooks(user)
             res.json(allBooks)
         } else {
             res.status(404).json({ error: 'Book not found' })
@@ -145,9 +169,9 @@ export function startServer(
     })
 
     app.post('/api/config', (req, res) => {
-        const configData = req.body
-        console.log('Updating config from mobile/web')
-        dataManager.saveConfig(configData)
+        const { username, ...configData } = req.body
+        console.log('Updating config from mobile/web', username)
+        dataManager.saveConfig(username, configData)
         res.json({ success: true })
     })
 

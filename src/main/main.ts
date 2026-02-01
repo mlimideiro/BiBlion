@@ -35,35 +35,36 @@ app.whenReady().then(() => {
     createWindow()
 
     // Start Server
-    const serverInfo = startServer(dataManager, metadataService, scraperService, () => {
+    const serverInfo = startServer(dataManager, metadataService, scraperService, (username, _book) => {
         // Notify desktop when a book is added/updated from mobile
-        mainWindow?.webContents.send('books-updated', dataManager.getAllBooks())
+        mainWindow?.webContents.send('books-updated', { username, books: dataManager.getAllBooks(username) })
     })
 
     // IPC Handlers
-    ipcMain.handle('get-books', () => dataManager.getAllBooks())
-    ipcMain.handle('save-book', (_event, book) => {
-        dataManager.saveBook(book)
-        return dataManager.getAllBooks()
+    // IPC Handlers
+    ipcMain.handle('get-books', (_event, username) => dataManager.getAllBooks(username))
+    ipcMain.handle('save-book', (_event, { username, book }) => {
+        dataManager.saveBook(username, book)
+        return dataManager.getAllBooks(username)
     })
-    ipcMain.handle('delete-book', (_event, isbn) => {
-        dataManager.deleteBook(isbn)
-        return dataManager.getAllBooks()
+    ipcMain.handle('delete-book', (_event, { username, isbn }) => {
+        dataManager.deleteBook(username, isbn)
+        return dataManager.getAllBooks(username)
     })
-    ipcMain.handle('bulk-save-books', (_event, books) => {
-        dataManager.saveBooks(books)
-        return dataManager.getAllBooks()
+    ipcMain.handle('bulk-save-books', (_event, { username, books }) => {
+        dataManager.saveBooks(username, books)
+        return dataManager.getAllBooks(username)
     })
-    ipcMain.handle('bulk-delete-books', (_event, isbns) => {
-        dataManager.deleteBooks(isbns)
-        return dataManager.getAllBooks()
+    ipcMain.handle('bulk-delete-books', (_event, { username, isbns }) => {
+        dataManager.deleteBooks(username, isbns)
+        return dataManager.getAllBooks(username)
     })
     ipcMain.handle('get-server-info', () => serverInfo)
 
     // Library & Config Handlers
-    ipcMain.handle('get-config', () => dataManager.getConfig())
-    ipcMain.handle('save-config', (_event, config) => {
-        dataManager.saveConfig(config)
+    ipcMain.handle('get-config', (_event, username) => dataManager.getConfig(username))
+    ipcMain.handle('save-config', (_event, { username, config }) => {
+        dataManager.saveConfig(username, config)
         // Notify mobile server if needed or refresh desktop data
         mainWindow?.webContents.send('config-updated', config)
         return config

@@ -7,59 +7,61 @@ const isElectron = !!(window as any).electron
 const API_BASE = isElectron ? '' : `${window.location.origin}/api`
 
 export const dataService = {
-    async getBooks(): Promise<Book[]> {
+    async getBooks(username?: string): Promise<Book[]> {
         if (isElectron) {
-            return window.electron.getBooks()
+            return window.electron.getBooks(username)
         }
-        const res = await axios.get(`${API_BASE}/books`)
+        const res = await axios.get(`${API_BASE}/books`, { params: { username } })
         return res.data
     },
 
-    async getConfig(): Promise<Config> {
+    async getConfig(username?: string): Promise<Config> {
         if (isElectron) {
-            return window.electron.getConfig()
+            return window.electron.getConfig(username)
         }
-        const res = await axios.get(`${API_BASE}/config`)
+        const res = await axios.get(`${API_BASE}/config`, { params: { username } })
         return res.data
     },
 
-    async saveBook(book: Book): Promise<any> {
+    async saveBook(book: Book, username?: string): Promise<any> {
         if (isElectron) {
-            return window.electron.saveBook(book)
+            return window.electron.saveBook({ username, book })
         }
-        const res = await axios.post(`${API_BASE}/save`, book)
+        // Merge username into body
+        const res = await axios.post(`${API_BASE}/save`, { ...book, username })
         return res.data
     },
 
-    async saveConfig(config: Config): Promise<any> {
+    async saveConfig(config: Config, username?: string): Promise<any> {
         if (isElectron) {
-            return window.electron.saveConfig(config)
+            return window.electron.saveConfig({ username, config })
         }
-        const res = await axios.post(`${API_BASE}/config`, config)
+        const res = await axios.post(`${API_BASE}/config`, { ...config, username })
         return res.data
     },
 
-    async deleteBook(isbn: string): Promise<any> {
+    async deleteBook(isbn: string, username?: string): Promise<any> {
         if (isElectron) {
-            return window.electron.deleteBook(isbn)
+            return window.electron.deleteBook({ username, isbn })
         }
-        const res = await axios.delete(`${API_BASE}/books/${isbn}`)
+        // DELETE with body is tricky in some clients, but axios supports it via 'data' config
+        const res = await axios.delete(`${API_BASE}/books/${isbn}`, { data: { username } })
         return res.data
     },
 
-    async bulkSaveBooks(books: Book[]): Promise<Book[]> {
+    async bulkSaveBooks(books: Book[], username?: string): Promise<Book[]> {
         if (isElectron) {
-            return window.electron.bulkSaveBooks(books)
+            return window.electron.bulkSaveBooks({ username, books })
         }
-        const res = await axios.post(`${API_BASE}/bulk-save`, books)
+        const res = await axios.post(`${API_BASE}/bulk-save`, { username, books })
         return res.data
     },
 
-    async bulkDeleteBooks(isbns: string[]): Promise<Book[]> {
+    async bulkDeleteBooks(isbns: string[], username?: string): Promise<Book[]> {
         if (isElectron) {
-            return window.electron.bulkDeleteBooks(isbns)
+            return window.electron.bulkDeleteBooks({ username, isbns })
         }
-        const res = await axios.post(`${API_BASE}/bulk-delete`, isbns)
+        const res = await axios.post(`${API_BASE}/bulk-delete`, { username, isbns })
         return res.data
     },
 

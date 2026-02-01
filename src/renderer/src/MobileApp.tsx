@@ -28,7 +28,8 @@ type StatusType = 'idle' | 'success' | 'processing' | 'error' | 'warning'
 const MobileApp: React.FC = () => {
     // Mode management
     const [mode, setMode] = useState<'idle' | 'scanning' | 'cropping' | 'processing' | 'result' | 'library'>('idle')
-    const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('biblion_user'))
+    const [currentUser, setCurrentUser] = useState<string | null>(localStorage.getItem('biblion_user'))
+    const [isLoggedIn, setIsLoggedIn] = useState(!!currentUser)
     const [books, setBooks] = useState<Book[]>([])
     const [config, setConfig] = useState<Config | null>(null)
     const [isBurstMode, setIsBurstMode] = useState(false)
@@ -52,11 +53,11 @@ const MobileApp: React.FC = () => {
     const [zoom, setZoom] = useState(1)
 
     useEffect(() => {
-        if (mode === 'library' || mode === 'idle') {
-            dataService.getBooks().then(setBooks)
-            dataService.getConfig().then(setConfig)
+        if ((mode === 'library' || mode === 'idle') && currentUser) {
+            dataService.getBooks(currentUser).then(setBooks)
+            dataService.getConfig(currentUser).then(setConfig)
         }
-    }, [mode])
+    }, [mode, currentUser])
 
     const updateStatus = (msg: string, type: StatusType = 'processing') => {
         setStatus({ msg, type })
@@ -270,7 +271,8 @@ const MobileApp: React.FC = () => {
 
         try {
             for (const book of booksToSave) {
-                await axios.post('/api/save', book)
+                // Use dataService to ensure consistent behavior with username
+                await dataService.saveBook(book as Book, currentUser || undefined)
             }
             updateStatus('¡Todo guardado!', 'success')
             setTimeout(() => {
@@ -330,7 +332,10 @@ const MobileApp: React.FC = () => {
     }
 
     if (!isLoggedIn) {
-        return <Login onLogin={() => setIsLoggedIn(true)} />
+        return <Login onLogin={(user) => {
+            setCurrentUser(user)
+            setIsLoggedIn(true)
+        }} />
     }
 
     return (
@@ -353,6 +358,7 @@ const MobileApp: React.FC = () => {
                         onUpdateConfig={setConfig}
                         isMobile={true}
                         onBack={() => setMode('idle')}
+                        currentUser={currentUser}
                     />
                 )}
 
