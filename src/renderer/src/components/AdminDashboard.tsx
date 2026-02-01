@@ -208,24 +208,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
                 {editingUser && (
                     <div className="modal-overlay" onClick={() => setEditingUser(null)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-                            <h3>Cambiar contraseña para {editingUser}</h3>
-                            <div className="input-group">
-                                <label>Nueva Contraseña</label>
-                                <input
-                                    type="text"
-                                    value={editPassword}
-                                    onChange={(e) => setEditPassword(e.target.value)}
-                                    placeholder="Ingresa la nueva clave"
-                                />
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px', background: '#1e1e26', border: '1px solid rgba(255,255,255,0.1)', padding: '30px' }}>
+                            <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#fff' }}>Cambiar contraseña para <span style={{ color: '#a78bfa' }}>{editingUser}</span></h3>
+
+                            <div className="form-group">
+                                <label style={{ display: 'block', color: '#ccc', marginBottom: '8px', fontSize: '0.9rem' }}>Nueva Contraseña</label>
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        type="text"
+                                        className="admin-input"
+                                        value={editPassword}
+                                        onChange={(e) => setEditPassword(e.target.value)}
+                                        placeholder="Ingresa la nueva clave"
+                                        autoFocus
+                                        style={{ width: '100%', padding: '12px', fontSize: '1rem' }}
+                                    />
+                                </div>
                             </div>
-                            <div className="modal-footer" style={{ marginTop: '20px' }}>
-                                <button className="action-btn" onClick={handleUpdateUser}>
-                                    <Save size={16} />
-                                    <span>Guardar</span>
-                                </button>
-                                <button className="action-btn secondary" onClick={() => setEditingUser(null)}>
+
+                            <div className="modal-footer" style={{ marginTop: '25px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                <button className="action-btn secondary" onClick={() => setEditingUser(null)} style={{ padding: '10px 15px', background: 'transparent', border: '1px solid #444', color: '#ccc' }}>
                                     Cancelar
+                                </button>
+                                <button className="action-btn" onClick={handleUpdateUser} style={{ padding: '10px 20px', background: '#a78bfa', color: '#000', fontWeight: 'bold' }}>
+                                    <Save size={18} />
+                                    <span>Guardar</span>
                                 </button>
                             </div>
                         </div>

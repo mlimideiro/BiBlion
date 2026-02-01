@@ -102,11 +102,17 @@ export class DataManager {
     public getConfig(username: string): Config {
         try {
             const { config: configFile } = this.getUserPaths(username)
-            const config = fs.readJsonSync(configFile)
+            const config = fs.readJsonSync(configFile) as Config
+            // Ensure tags array exists
             if (!config.tags) config.tags = []
             return config
-        } catch (e) {
-            return { libraries: [{ id: 'default', name: 'Principal' }], activeLibraryId: 'default', tags: [] }
+        } catch (error) {
+            console.error('Error reading Config:', error)
+            return {
+                libraries: [{ id: 'default', name: 'Principal' }],
+                activeLibraryId: 'default',
+                tags: []
+            }
         }
     }
 
