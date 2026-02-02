@@ -235,8 +235,44 @@ export class DataManager {
     }
 
     private createBackup(books: Book[], username: string) {
-        const date = new Date().toISOString().split('T')[0]
-        const backupFile = path.join(BACKUP_DIR, `books_${username}_${date}.json`)
-        fs.writeJsonSync(backupFile, books, { spaces: 2 })
+        try {
+            const date = new Date().toISOString().split('T')[0]
+            const backupFile = path.join(BACKUP_DIR, `books_${username}_${date}.json`)
+            fs.writeJsonSync(backupFile, books, { spaces: 2 })
+
+            // Clean up old backups for this user
+            this.rotateBackups(username)
+        } catch (error) {
+            console.error('[DataManager] Backup error:', error)
+        }
+    }
+
+    private rotateBackups(username: string) {
+        try {
+            const files = fs.readdirSync(BACKUP_DIR)
+            const prefix = `books_${username}_`
+
+            // Filter user backups and get stats
+            const userBackups = files
+                .filter(f => f.startsWith(prefix) && f.endsWith('.json'))
+                .map(f => ({
+                    name: f,
+                    path: path.join(BACKUP_DIR, f),
+                    mtime: fs.statSync(path.join(BACKUP_DIR, f)).mtime.getTime()
+                }))
+                // Sort by modification time (descending)
+                .sort((a, b) => b.mtime - a.mtime)
+
+            // Keep only the last 10
+            if (userBackups.length > 10) {
+                const toDelete = userBackups.slice(10)
+                toDelete.forEach(file => {
+                    console.log(`[DataManager] Deleting old backup: ${file.name}`)
+                    fs.unlinkSync(file.path)
+                })
+            }
+        } catch (error) {
+            console.error('[DataManager] Rotation error:', error)
+        }
     }
 }
