@@ -16,6 +16,8 @@ export interface Book {
     // User fields
     location?: string
     status?: 'reading' | 'read' | 'borrowed' | 'available'
+    borrowerName?: string
+    loanDate?: string
     notes?: string
     tags?: string[]
 }

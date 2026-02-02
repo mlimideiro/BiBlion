@@ -9,6 +9,9 @@ export interface Book {
     pageCount?: number
     libraryId?: string
     tags?: string[]
+    status?: 'reading' | 'read' | 'borrowed' | 'available' | ''
+    borrowerName?: string
+    loanDate?: string
     createdAt?: string
     updatedAt?: string
 }

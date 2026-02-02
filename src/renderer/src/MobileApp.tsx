@@ -11,6 +11,8 @@ import { LibraryView } from './components/LibraryView'
 import { Book, Config } from './types'
 import { dataService } from './services/dataService'
 import { Login } from './components/Login'
+import { LoansModal } from './components/LoansModal'
+import { HandHelping } from 'lucide-react'
 
 interface BookMetadata {
     isbn: string
@@ -36,6 +38,7 @@ const MobileApp: React.FC = () => {
     const [status, setStatus] = useState<{ msg: string; type: StatusType }>({ msg: 'Listo para escaneo', type: 'idle' })
     const [pendingBooks, setPendingBooks] = useState<BookMetadata[]>([])
     const [manualIsbn, setManualIsbn] = useState('')
+    const [loansOpen, setLoansOpen] = useState(false)
     const scannerRef = useRef<Html5Qrcode | null>(null)
     const lastScannedIsbn = useRef<string | null>(null)
     const scanTimeout = useRef<any>(null)
@@ -272,7 +275,12 @@ const MobileApp: React.FC = () => {
         try {
             for (const book of booksToSave) {
                 // Use dataService to ensure consistent behavior with username
-                await dataService.saveBook(book as Book, currentUser || undefined)
+                // Convert BookMetadata to Book (omitting the internal 'status' field)
+                const { status: _metaStatus, ...bookData } = book as any
+                await dataService.saveBook({
+                    ...bookData,
+                    status: 'available'
+                } as Book, currentUser || undefined)
             }
             updateStatus('¡Todo guardado!', 'success')
             setTimeout(() => {
@@ -285,6 +293,18 @@ const MobileApp: React.FC = () => {
         } catch (err) {
             updateStatus('Error al guardar', 'error')
             setMode('result')
+        }
+    }
+
+    const handleLoansSaveBook = async (book: Book) => {
+        if (!currentUser) return
+        try {
+            await dataService.saveBook(book, currentUser)
+            // Refresh books list
+            const updated = await dataService.getBooks(currentUser)
+            setBooks(updated)
+        } catch (e) {
+            console.error("Error saving loan status", e)
         }
     }
 
@@ -445,10 +465,23 @@ const MobileApp: React.FC = () => {
                             </div>
                             <div className="menu-card-content">
                                 <span className="menu-card-title">Ver BiBlion</span>
-                                <span className="menu-card-subtitle">Administra tu colección</span>
+                                <span className="menu-card-subtitle">{books.length} Libritos guardados</span>
                             </div>
                             <div className="menu-card-chevron">
                                 <ChevronRight size={24} />
+                            </div>
+                        </button>
+
+                        <button className="menu-card" onClick={() => setLoansOpen(true)} style={{ borderLeft: '4px solid var(--mobile-accent)' }}>
+                            <div className="menu-card-icon">
+                                <HandHelping size={40} strokeWidth={1.5} color="var(--mobile-accent)" />
+                            </div>
+                            <div className="menu-card-content">
+                                <span className="menu-card-title">Préstamos</span>
+                                <span className="menu-card-subtitle">Gestionar libros prestados</span>
+                            </div>
+                            <div className="menu-card-chevron">
+                                <HandHelping size={24} />
                             </div>
                         </button>
                     </div>
@@ -587,6 +620,13 @@ const MobileApp: React.FC = () => {
                     </footer>
                 )
             }
+            {loansOpen && (
+                <LoansModal
+                    books={books}
+                    onSaveBook={handleLoansSaveBook}
+                    onClose={() => setLoansOpen(false)}
+                />
+            )}
         </div >
     )
 }

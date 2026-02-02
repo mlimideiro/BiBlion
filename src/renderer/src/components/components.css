@@ -1,6 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
+    box-sizing: border-box;
+}
+
+*,
+*:before,
+*:after {
+    box-sizing: inherit;
+}
+
+:root {
     --bg-dark: #0a0b10;
     --bg-gradient: radial-gradient(circle at 50% 0%, #1c1b3d 0%, #0d0c22 50%, #050510 100%);
     --glass-bg: rgba(22, 22, 45, 0.6);
@@ -303,6 +313,7 @@ body {
     padding: 40px;
     gap: 40px;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .modal-cover {
@@ -991,6 +1002,18 @@ body {
     border-color: var(--accent);
     color: white;
     box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.select-mode-btn.loans-btn {
+    background: rgba(139, 123, 168, 0.1);
+    color: var(--accent);
+    border: 1px solid rgba(139, 123, 168, 0.2);
+}
+
+.select-mode-btn.loans-btn:hover {
+    background: rgba(139, 123, 168, 0.2);
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
 }
 
 .action-btn:hover {

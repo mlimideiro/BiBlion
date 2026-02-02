@@ -3,7 +3,7 @@ import { Book, Config } from '../types'
 import { BookListItem } from './BookListItem'
 import { SearchBar } from './SearchBar'
 import { dataService } from '../services/dataService'
-import { X, Sparkles, Trash2, ChevronRight } from 'lucide-react'
+import { X, Sparkles, Trash2, ChevronRight, HandHelping } from 'lucide-react'
 
 interface Props {
     books: Book[]
@@ -245,6 +245,25 @@ export const LibraryView: React.FC<Props> = ({
                                     <p><strong>ISBN:</strong> {selectedBook.isbn}</p>
                                     {selectedBook.publisher && <p><strong>Editorial:</strong> {selectedBook.publisher}</p>}
                                     {selectedBook.pageCount && <p><strong>Páginas:</strong> {selectedBook.pageCount}</p>}
+
+                                    {selectedBook.status === 'borrowed' && (
+                                        <div style={{
+                                            marginTop: '15px',
+                                            padding: '12px',
+                                            background: 'rgba(245, 158, 11, 0.1)',
+                                            border: '1px solid rgba(245, 158, 11, 0.2)',
+                                            borderRadius: '8px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px'
+                                        }}>
+                                            <HandHelping size={18} color="#8b7ba8" />
+                                            <div>
+                                                <div style={{ color: '#8b7ba8', fontWeight: 'bold', fontSize: '0.9rem' }}>PRESTADO A:</div>
+                                                <div style={{ color: '#fff', fontSize: '1.1rem' }}>{selectedBook.borrowerName} <span style={{ color: '#888', fontSize: '0.85rem' }}>({selectedBook.loanDate ? selectedBook.loanDate.split('-').reverse().join('/') : ''})</span></div>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <div className="modal-library-select">
                                         <strong>Biblioteca:</strong>

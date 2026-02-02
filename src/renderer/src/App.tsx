@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { BookListItem } from './components/BookListItem'
 import { SearchBar } from './components/SearchBar'
-import { Trash2, LayoutGrid, Settings, Download, X, Sparkles, User } from 'lucide-react'
+import { Trash2, LayoutGrid, Settings, Download, X, Sparkles, User, HandHelping } from 'lucide-react'
 import { SettingsModal } from './components/SettingsModal'
 import { dataService } from './services/dataService'
 import { Book, Config, Library } from './types'
@@ -10,6 +10,7 @@ import './components/components.css'
 import logo from './assets/logo.png'
 import { Login } from './components/Login'
 import { AdminDashboard } from './components/AdminDashboard'
+import { LoansModal } from './components/LoansModal'
 
 function App() {
     const [books, setBooks] = useState<Book[]>([])
@@ -31,6 +32,7 @@ function App() {
     const [showScraperPanel, setShowScraperPanel] = useState(false)
     const [scraperUrl, setScraperUrl] = useState('')
     const [bookMenuOpen, setBookMenuOpen] = useState(false)
+    const [loansOpen, setLoansOpen] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
     const bookMenuRef = useRef<HTMLDivElement>(null)
 
@@ -310,6 +312,20 @@ function App() {
         }
     }
 
+    const handleLoansSaveBook = async (book: Book) => {
+        if (!currentUser) return
+        try {
+            const updatedBooks = await dataService.saveBook(book, currentUser)
+            setBooks(updatedBooks)
+            // If the book updated is the one currently viewing, update it too
+            if (selectedBook && selectedBook.isbn === book.isbn) {
+                setSelectedBook(book)
+            }
+        } catch (e) {
+            alert("Error al actualizar el estado del préstamo")
+        }
+    }
+
     const handleLogin = (username: string, isAdmin: boolean) => {
         setCurrentUser(username)
         setIsLoggedIn(true)
@@ -382,6 +398,15 @@ function App() {
                         >
                             {isSelectionMode ? <X size={16} /> : <LayoutGrid size={16} />}
                             <span>{isSelectionMode ? 'Cancelar' : 'Seleccionar'}</span>
+                        </button>
+
+                        <button
+                            className="select-mode-btn loans-btn"
+                            onClick={() => setLoansOpen(true)}
+                            title="Gestionar Préstamos"
+                        >
+                            <HandHelping size={16} />
+                            <span>Préstamos</span>
                         </button>
                     </div>
 
@@ -595,6 +620,25 @@ function App() {
                                                     {selectedBook.publisher && <p><strong>Editorial:</strong> {selectedBook.publisher}</p>}
                                                     {selectedBook.pageCount && <p><strong>Páginas:</strong> {selectedBook.pageCount}</p>}
 
+                                                    {selectedBook.status === 'borrowed' && (
+                                                        <div style={{
+                                                            marginTop: '15px',
+                                                            padding: '12px',
+                                                            background: 'rgba(245, 158, 11, 0.1)',
+                                                            border: '1px solid rgba(245, 158, 11, 0.2)',
+                                                            borderRadius: '8px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '10px'
+                                                        }}>
+                                                            <HandHelping size={18} color="#8b7ba8" />
+                                                            <div>
+                                                                <div style={{ color: '#8b7ba8', fontWeight: 'bold', fontSize: '0.9rem' }}>PRESTADO A:</div>
+                                                                <div style={{ color: '#fff', fontSize: '1.1rem' }}>{selectedBook.borrowerName} <span style={{ color: '#888', fontSize: '0.85rem' }}>({selectedBook.loanDate ? selectedBook.loanDate.split('-').reverse().join('/') : ''})</span></div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
                                                     <div className="modal-library-move" style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                         <strong>Biblioteca:</strong>
                                                         <select
@@ -707,6 +751,13 @@ function App() {
                     />
                 )
             }
+            {loansOpen && (
+                <LoansModal
+                    books={books}
+                    onSaveBook={handleLoansSaveBook}
+                    onClose={() => setLoansOpen(false)}
+                />
+            )}
         </div >
     )
 }
