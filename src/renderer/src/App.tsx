@@ -44,12 +44,16 @@ function App() {
     }
 
     useEffect(() => {
-        // Initial fetch
         if (currentUser) {
             dataService.getBooks(currentUser).then(setBooks)
             dataService.getConfig(currentUser).then(setConfig)
+        } else {
+            setBooks([])
+            setConfig(null)
         }
+    }, [currentUser])
 
+    useEffect(() => {
         // Listen for updates
         window.electron?.onUpdate((data: any) => {
             // Check if update is for current user
@@ -84,7 +88,7 @@ function App() {
         }
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
-    }, [])
+    }, [currentUser])
 
     useEffect(() => {
         let result = books
@@ -327,6 +331,7 @@ function App() {
     }
 
     const handleLogin = (username: string, isAdmin: boolean) => {
+        localStorage.setItem('biblion_user', username)
         setCurrentUser(username)
         setIsLoggedIn(true)
         if (isAdmin) {

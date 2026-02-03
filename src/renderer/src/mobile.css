@@ -197,12 +197,15 @@ body {
 .menu-card {
     background: var(--card-bg);
     border: 1px solid var(--card-border);
+    border-left: 4px solid var(--mobile-accent);
     border-radius: 20px;
     padding: 20px;
     display: flex;
+    flex-direction: row;
     align-items: center;
     gap: 15px;
     width: 100%;
+    position: relative;
     backdrop-filter: blur(10px);
     color: var(--mobile-text);
     cursor: pointer;
@@ -216,32 +219,40 @@ body {
 }
 
 .menu-card-icon {
-    color: var(--mobile-text);
+    color: var(--mobile-accent);
     display: flex;
     align-items: center;
     justify-content: center;
-    opacity: 0.9;
+    width: 40px;
 }
 
 .menu-card-content {
     flex: 1;
+    text-align: center;
+    padding-right: 40px;
 }
 
 .menu-card-title {
-    font-size: 1.05rem;
-    font-weight: 600;
-    margin-bottom: 4px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 6px;
     display: block;
+    color: #fff;
 }
 
 .menu-card-subtitle {
-    font-size: 0.85rem;
-    color: var(--mobile-text-secondary);
+    font-size: 0.9rem;
+    color: #fff;
+    opacity: 0.7;
     display: block;
 }
 
 .menu-card-chevron {
-    color: #555;
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255, 255, 255, 0.3);
 }
 
 /* Manual Input Card */
@@ -296,6 +307,13 @@ body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    padding: 0 !important;
+}
+
+.search-btn svg {
+    width: 30px !important;
+    height: 30px !important;
+    stroke-width: 2.5px !important;
 }
 
 /* Sticky Footer */

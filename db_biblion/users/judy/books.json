@@ -1,0 +1,29 @@
+[
+  {
+    "title": "El Buen Mal, De Samanta, Schweblin. Editorial Literatura Random House, Tapa Blanda, Edición 1 En Español, 2025 - $ 21.900",
+    "authors": [
+      "Samanta Schweblin"
+    ],
+    "publisher": "Random House",
+    "pageCount": 192,
+    "coverUrl": "https://covers.openlibrary.org/b/id/14861108-L.jpg",
+    "isbn": "9789877693898",
+    "status": "borrowed",
+    "createdAt": "2026-02-02T22:48:17.054Z",
+    "updatedAt": "2026-02-02T23:17:47.134Z",
+    "libraryId": "default",
+    "coverPath": "https://http2.mlstatic.com/D_NQ_NP_707432-MLA81865116502_012025-O.webp",
+    "description": "Año de publicación: 2025. | Con índice: Sí. | Tapa del libro: Blanda. | Género: Literatura y ficción. | Número de páginas: 192. | ISBN: 9789877693898.",
+    "borrowerName": "qwer",
+    "loanDate": "2026-02-02"
+  },
+  {
+    "isbn": "9789500771870",
+    "title": "MI NOMBRE ES EMILIA DEL VALLE",
+    "authors": [],
+    "status": "available",
+    "createdAt": "2026-02-02T22:49:00.640Z",
+    "updatedAt": "2026-02-02T22:49:00.640Z",
+    "libraryId": ""
+  }
+]

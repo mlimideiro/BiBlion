@@ -353,6 +353,7 @@ const MobileApp: React.FC = () => {
 
     if (!isLoggedIn) {
         return <Login onLogin={(user) => {
+            localStorage.setItem('biblion_user', user)
             setCurrentUser(user)
             setIsLoggedIn(true)
         }} />
@@ -455,7 +456,7 @@ const MobileApp: React.FC = () => {
                                 placeholder="Ingresar ISBN manualmente"
                             />
                             <button onClick={handleManualSubmit} className="search-btn">
-                                <Search size={22} />
+                                <Search />
                             </button>
                         </div>
 
@@ -472,16 +473,16 @@ const MobileApp: React.FC = () => {
                             </div>
                         </button>
 
-                        <button className="menu-card" onClick={() => setLoansOpen(true)} style={{ borderLeft: '4px solid var(--mobile-accent)' }}>
+                        <button className="menu-card" onClick={() => setLoansOpen(true)}>
                             <div className="menu-card-icon">
-                                <HandHelping size={40} strokeWidth={1.5} color="var(--mobile-accent)" />
+                                <HandHelping size={40} strokeWidth={1.5} />
                             </div>
                             <div className="menu-card-content">
                                 <span className="menu-card-title">Préstamos</span>
                                 <span className="menu-card-subtitle">Gestionar libros prestados</span>
                             </div>
                             <div className="menu-card-chevron">
-                                <HandHelping size={24} />
+                                <ChevronRight size={24} />
                             </div>
                         </button>
                     </div>
