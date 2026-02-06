@@ -9,9 +9,13 @@ export interface Book {
     pageCount?: number
     libraryId?: string
     tags?: string[]
-    status?: 'reading' | 'read' | 'borrowed' | 'available' | ''
+    status?: 'reading' | 'read' | 'borrowed' | 'available' | 'wishlist' | ''
     borrowerName?: string
     loanDate?: string
+    wishlistPrice?: string
+    wishlistLocation?: string
+    wishlistPriority?: number // 1-3
+    wishlistNotes?: string
     createdAt?: string
     updatedAt?: string
 }

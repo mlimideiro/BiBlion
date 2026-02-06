@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { BookListItem } from './components/BookListItem'
 import { SearchBar } from './components/SearchBar'
-import { Trash2, LayoutGrid, Settings, Download, X, Sparkles, User, HandHelping } from 'lucide-react'
+import { LayoutGrid, Settings, User, HandHelping, X, Download, Gift, Trash2, Sparkles } from 'lucide-react'
 import { SettingsModal } from './components/SettingsModal'
 import { dataService } from './services/dataService'
 import { Book, Config, Library } from './types'
@@ -11,6 +11,8 @@ import logo from './assets/logo.png'
 import { Login } from './components/Login'
 import { AdminDashboard } from './components/AdminDashboard'
 import { LoansModal } from './components/LoansModal'
+import { WishlistModal } from './components/WishlistModal'
+
 
 function App() {
     const [books, setBooks] = useState<Book[]>([])
@@ -21,6 +23,8 @@ function App() {
     const [filteredBooks, setFilteredBooks] = useState<Book[]>([])
     const [menuOpen, setMenuOpen] = useState(false)
     const [settingsOpen, setSettingsOpen] = useState(false)
+    const [loansOpen, setLoansOpen] = useState(false)
+    const [wishlistOpen, setWishlistOpen] = useState(false)
     const [isSelectionMode, setIsSelectionMode] = useState(false)
     const [selectedIsbns, setSelectedIsbns] = useState<string[]>([])
     const [thumbnailSize, setThumbnailSize] = useState<'S' | 'M' | 'L' | 'XL'>(
@@ -32,7 +36,8 @@ function App() {
     const [showScraperPanel, setShowScraperPanel] = useState(false)
     const [scraperUrl, setScraperUrl] = useState('')
     const [bookMenuOpen, setBookMenuOpen] = useState(false)
-    const [loansOpen, setLoansOpen] = useState(false)
+    const [selectedBook, setSelectedBook] = useState<Book | null>(null)
+    const [repairing, setRepairing] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
     const bookMenuRef = useRef<HTMLDivElement>(null)
 
@@ -54,29 +59,6 @@ function App() {
     }, [currentUser])
 
     useEffect(() => {
-        // Listen for updates
-        window.electron?.onUpdate((data: any) => {
-            // Check if update is for current user
-            // data format: { username, books } or just books (legacy)
-            // If data is array, it's legacy (or from fallback). 
-            // BUT main.ts now sends { username, books }
-            if (data.username && data.username === currentUser) {
-                setBooks(data.books)
-                // Update selectedBook if it's currently open to reflect latest DB changes
-                setSelectedBook(prev => {
-                    if (!prev) return null
-                    const updated = data.books.find((b: Book) => b.isbn === prev.isbn)
-                    return updated || null
-                })
-            }
-        })
-
-        window.electron?.onConfigUpdate((updatedConfig: Config) => {
-            // Config update usually triggered by ourselves or mobile for same user
-            // Ideally this should also carry username, but for now assuming valid
-            setConfig(updatedConfig)
-        })
-
         // Close menu on click outside
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -88,7 +70,7 @@ function App() {
         }
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
-    }, [currentUser])
+    }, [])
 
     useEffect(() => {
         let result = books
@@ -96,10 +78,12 @@ function App() {
         // 1. Filter by active library
         if (config && config.activeLibraryId) {
             if (config.activeLibraryId === 'unassigned') {
-                result = result.filter(b => !b.libraryId || b.libraryId === "")
+                result = result.filter(b => (!b.libraryId || b.libraryId === "") && b.status !== 'wishlist')
             } else {
-                result = result.filter(b => b.libraryId === config.activeLibraryId)
+                result = result.filter(b => b.libraryId === config.activeLibraryId && b.status !== 'wishlist')
             }
+        } else {
+            result = result.filter(b => b.status !== 'wishlist')
         }
 
         // 2. Filter by search query
@@ -141,7 +125,7 @@ function App() {
     const handleSwitchLibrary = async (libId: string) => {
         if (!config || !currentUser) return
         const newConfig = { ...config, activeLibraryId: libId }
-        await dataService.saveConfig(newConfig, currentUser)
+        await dataService.saveConfig(currentUser, newConfig)
         setConfig(newConfig)
     }
 
@@ -152,7 +136,7 @@ function App() {
         if (!libs.find(l => l.id === newConfig.activeLibraryId)) {
             newConfig.activeLibraryId = 'default'
         }
-        await dataService.saveConfig(newConfig, currentUser)
+        await dataService.saveConfig(currentUser, newConfig)
         setConfig(newConfig)
         setSettingsOpen(false)
     }
@@ -190,7 +174,7 @@ function App() {
         if (selectedIsbns.length === 0 || !currentUser) return
         if (confirm(`¿Estás seguro de eliminar ${selectedIsbns.length} libros?`)) {
             try {
-                const updatedBooks = await dataService.bulkDeleteBooks(selectedIsbns, currentUser)
+                const updatedBooks = await dataService.bulkDeleteBooks(currentUser, selectedIsbns)
                 setBooks(updatedBooks)
                 setSelectedIsbns([])
                 setIsSelectionMode(false)
@@ -207,7 +191,7 @@ function App() {
                 .filter(b => selectedIsbns.includes(b.isbn))
                 .map(b => ({ ...b, libraryId }))
 
-            const updatedBooks = await dataService.bulkSaveBooks(booksToUpdate, currentUser)
+            const updatedBooks = await dataService.bulkSaveBooks(currentUser, booksToUpdate)
             setBooks(updatedBooks)
             setSelectedIsbns([])
             setIsSelectionMode(false)
@@ -217,14 +201,12 @@ function App() {
         }
     }
 
-    const [selectedBook, setSelectedBook] = useState<Book | null>(null)
-    const [repairing, setRepairing] = useState(false)
 
     const handleDelete = async () => {
         if (!selectedBook || !currentUser) return
         if (confirm('¿Estás seguro de eliminar este libro?')) {
             try {
-                const updatedBooks = await dataService.deleteBook(selectedBook.isbn, currentUser)
+                const updatedBooks = await dataService.deleteBook(currentUser, selectedBook.isbn)
                 setBooks(updatedBooks)
                 setSelectedBook(null)
             } catch (e) {
@@ -241,7 +223,7 @@ function App() {
             const data = await dataService.repairMetadata(selectedBook.isbn)
             if (data) {
                 const updatedBook = { ...selectedBook, ...data }
-                const updatedBooks = await dataService.saveBook(updatedBook, currentUser || undefined)
+                const updatedBooks = await dataService.saveBook(currentUser || '', updatedBook)
                 setBooks(updatedBooks)
                 setSelectedBook(updatedBook)
                 alert("¡Datos actualizados!")
@@ -258,7 +240,7 @@ function App() {
     const handleMoveLibrary = async (libraryId: string) => {
         if (!selectedBook || !currentUser) return
         const updatedBook = { ...selectedBook, libraryId }
-        const updatedBooks = await dataService.saveBook(updatedBook, currentUser)
+        const updatedBooks = await dataService.saveBook(currentUser, updatedBook)
         setBooks(updatedBooks)
         setSelectedBook(updatedBook)
     }
@@ -268,7 +250,7 @@ function App() {
         const currentTags = selectedBook.tags || []
         if (currentTags.includes(tagName)) return
         const updatedBook = { ...selectedBook, tags: [...currentTags, tagName] }
-        const updatedBooks = await dataService.saveBook(updatedBook, currentUser)
+        const updatedBooks = await dataService.saveBook(currentUser, updatedBook)
         setBooks(updatedBooks)
         setSelectedBook(updatedBook)
     }
@@ -277,7 +259,7 @@ function App() {
         if (!selectedBook || !currentUser) return
         const currentTags = selectedBook.tags || []
         const updatedBook = { ...selectedBook, tags: currentTags.filter(t => t !== tagName) }
-        const updatedBooks = await dataService.saveBook(updatedBook, currentUser)
+        const updatedBooks = await dataService.saveBook(currentUser, updatedBook)
         setBooks(updatedBooks)
         setSelectedBook(updatedBook)
     }
@@ -286,7 +268,7 @@ function App() {
         if (!selectedBook || !currentUser) return
         try {
             const updatedBook = { ...selectedBook, ...updatedData }
-            const updatedBooks = await dataService.saveBook(updatedBook, currentUser)
+            const updatedBooks = await dataService.saveBook(currentUser, updatedBook)
             setBooks(updatedBooks)
             setSelectedBook(updatedBook)
             setIsEditingBook(false)
@@ -302,7 +284,7 @@ function App() {
             if (data && selectedBook) {
                 const updatedBook = { ...selectedBook, ...data }
                 // Persist the changes immediately
-                const updatedBooks = await dataService.saveBook(updatedBook, currentUser)
+                const updatedBooks = await dataService.saveBook(currentUser, updatedBook)
                 setBooks(updatedBooks)
                 setSelectedBook(updatedBook)
                 setScraperUrl('')
@@ -316,17 +298,17 @@ function App() {
         }
     }
 
-    const handleLoansSaveBook = async (book: Book) => {
+    const handleSaveBook = async (book: Book) => {
         if (!currentUser) return
         try {
-            const updatedBooks = await dataService.saveBook(book, currentUser)
+            const updatedBooks = await dataService.saveBook(currentUser, book)
             setBooks(updatedBooks)
             // If the book updated is the one currently viewing, update it too
             if (selectedBook && selectedBook.isbn === book.isbn) {
                 setSelectedBook(book)
             }
         } catch (e) {
-            alert("Error al actualizar el estado del préstamo")
+            alert("Error al actualizar el estado del libro")
         }
     }
 
@@ -416,11 +398,20 @@ function App() {
                     </div>
 
                     <div className="controls-group right">
+                        <button
+                            className="select-mode-btn"
+                            onClick={() => setWishlistOpen(true)}
+                            style={{ background: 'rgba(139, 123, 168, 0.1)', color: '#8b7ba8', border: '1px solid rgba(139, 123, 168, 0.2)', marginRight: '10px' }}
+                            title="Lista de Deseos"
+                        >
+                            <Gift size={16} />
+                            <span>Deseados</span>
+                        </button>
+
                         <div className="server-info">
                             <span style={{ marginRight: 8 }}>📲</span>
                             Escanea desde: <a href={mobileUrl} target="_blank" className="mobile-link">{mobileUrl}</a>
                         </div>
-
 
                         <div className="settings-container" ref={menuRef}>
                             <button
@@ -756,13 +747,26 @@ function App() {
                     />
                 )
             }
-            {loansOpen && (
-                <LoansModal
-                    books={books}
-                    onSaveBook={handleLoansSaveBook}
-                    onClose={() => setLoansOpen(false)}
-                />
-            )}
+            {
+                loansOpen && (
+                    <LoansModal
+                        books={books}
+                        onSaveBook={handleSaveBook}
+                        onClose={() => setLoansOpen(false)}
+                    />
+                )
+            }
+
+            {
+                wishlistOpen && (
+                    <WishlistModal
+                        books={books}
+                        config={config}
+                        onSaveBook={handleSaveBook}
+                        onClose={() => setWishlistOpen(false)}
+                    />
+                )
+            }
         </div >
     )
 }

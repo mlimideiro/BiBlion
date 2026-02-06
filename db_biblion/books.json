@@ -148,5 +148,21 @@
     "status": "available",
     "borrowerName": "",
     "loanDate": ""
+  },
+  {
+    "isbn": "WISH1770262690655",
+    "title": "Angelo Badalamenti: Soundtrack De Twin Peaks, De Clare Nina Norelli. Editorial Dobra Robota Editora, Edición 1 En Español, 2025 - $ 23.000",
+    "authors": [
+      "Desconocido"
+    ],
+    "publisher": "",
+    "description": "Año de publicación: 2025. | Género: Arte, cine y fotografía. | Número de páginas: 196. | ISBN: 9786319037654.",
+    "pageCount": 0,
+    "coverPath": "",
+    "status": "wishlist",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-05T03:38:10.923Z",
+    "createdAt": "2026-02-05T03:38:10.923Z",
+    "libraryId": ""
   }
 ]

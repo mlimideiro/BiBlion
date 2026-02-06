@@ -3,13 +3,13 @@
   "productName": "BiBlion",
   "version": "1.0.0",
   "description": "Biblioteca personal con escaneo de ISBN desde el celular",
-  "main": "dist/main/main.js",
+  "main": "dist/main/standalone.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
+    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:server\"",
     "dev:vite": "vite",
-    "dev:electron": "wait-on tcp:5173 && nodemon --watch src/main --ext ts --exec \"tsc -p tsconfig.node.json && electron .\"",
-    "server:standalone": "node dist/main/standalone.js",
+    "dev:server": "nodemon --watch src/main --ext ts --exec \"tsc -p tsconfig.node.json && node dist/main/standalone.js\"",
     "build": "tsc -p tsconfig.node.json && vite build",
+    "server": "node dist/main/standalone.js",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },

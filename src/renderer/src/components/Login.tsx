@@ -18,20 +18,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         setLoading(true)
 
         try {
-            const isElectron = !!(window as any).electron
-            let data: any
-
-            if (isElectron) {
-                data = await (window as any).electron.login({ username, password })
-            } else {
-                const API_BASE = `${window.location.origin}/api`
-                const response = await fetch(`${API_BASE}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                })
-                data = await response.json()
-            }
+            const API_BASE = `${window.location.origin}/api`
+            const response = await fetch(`${API_BASE}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            })
+            const data = await response.json()
 
             if (data.success) {
                 localStorage.setItem('biblion_user', data.username)

@@ -21,7 +21,6 @@ export const LibraryView: React.FC<Props> = ({
     onUpdateBooks,
     onUpdateConfig,
     isMobile = false,
-    onBack,
     currentUser
 }) => {
     const [filteredBooks, setFilteredBooks] = useState<Book[]>([])
@@ -53,10 +52,13 @@ export const LibraryView: React.FC<Props> = ({
         // 1. Filter by active library
         if (config && config.activeLibraryId) {
             if (config.activeLibraryId === 'unassigned') {
-                result = result.filter(b => !b.libraryId || b.libraryId === "")
+                result = result.filter(b => (!b.libraryId || b.libraryId === "") && b.status !== 'wishlist')
             } else {
-                result = result.filter(b => b.libraryId === config.activeLibraryId)
+                result = result.filter(b => b.libraryId === config.activeLibraryId && b.status !== 'wishlist')
             }
+        } else {
+            // If viewing all libraries, filter out wishlist books
+            result = result.filter(b => b.status !== 'wishlist')
         }
         // If config.activeLibraryId is null/undefined, show all books (default)
 

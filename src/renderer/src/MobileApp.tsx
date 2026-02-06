@@ -5,14 +5,14 @@ import Tesseract from 'tesseract.js'
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
 import './mobile.css'
-import { ScanBarcode, Library, Image as ImageIcon, Camera, Search, ChevronRight, X, Sparkles, User } from 'lucide-react'
+import { ScanBarcode, Library, Image as ImageIcon, Camera, Search, ChevronRight, X, Sparkles, User, HandHelping, Gift } from 'lucide-react'
 import logo from './assets/logo.png'
 import { LibraryView } from './components/LibraryView'
 import { Book, Config } from './types'
 import { dataService } from './services/dataService'
 import { Login } from './components/Login'
 import { LoansModal } from './components/LoansModal'
-import { HandHelping } from 'lucide-react'
+import { WishlistModal } from './components/WishlistModal'
 
 interface BookMetadata {
     isbn: string
@@ -39,6 +39,7 @@ const MobileApp: React.FC = () => {
     const [pendingBooks, setPendingBooks] = useState<BookMetadata[]>([])
     const [manualIsbn, setManualIsbn] = useState('')
     const [loansOpen, setLoansOpen] = useState(false)
+    const [wishlistOpen, setWishlistOpen] = useState(false)
     const scannerRef = useRef<Html5Qrcode | null>(null)
     const lastScannedIsbn = useRef<string | null>(null)
     const scanTimeout = useRef<any>(null)
@@ -277,10 +278,10 @@ const MobileApp: React.FC = () => {
                 // Use dataService to ensure consistent behavior with username
                 // Convert BookMetadata to Book (omitting the internal 'status' field)
                 const { status: _metaStatus, ...bookData } = book as any
-                await dataService.saveBook({
+                await dataService.saveBook(currentUser || '', {
                     ...bookData,
                     status: 'available'
-                } as Book, currentUser || undefined)
+                } as Book)
             }
             updateStatus('¡Todo guardado!', 'success')
             setTimeout(() => {
@@ -296,15 +297,15 @@ const MobileApp: React.FC = () => {
         }
     }
 
-    const handleLoansSaveBook = async (book: Book) => {
+    const handleSaveBook = async (book: Book) => {
         if (!currentUser) return
         try {
-            await dataService.saveBook(book, currentUser)
+            await dataService.saveBook(currentUser, book)
             // Refresh books list
             const updated = await dataService.getBooks(currentUser)
             setBooks(updated)
         } catch (e) {
-            console.error("Error saving loan status", e)
+            console.error("Error saving book status", e)
         }
     }
 
@@ -485,6 +486,19 @@ const MobileApp: React.FC = () => {
                                 <ChevronRight size={24} />
                             </div>
                         </button>
+
+                        <button className="menu-card" onClick={() => setWishlistOpen(true)}>
+                            <div className="menu-card-icon">
+                                <Gift size={40} strokeWidth={1.5} />
+                            </div>
+                            <div className="menu-card-content">
+                                <span className="menu-card-title">Deseados</span>
+                                <span className="menu-card-subtitle">Libros por comprar</span>
+                            </div>
+                            <div className="menu-card-chevron">
+                                <ChevronRight size={24} />
+                            </div>
+                        </button>
                     </div>
                 )}
 
@@ -624,8 +638,18 @@ const MobileApp: React.FC = () => {
             {loansOpen && (
                 <LoansModal
                     books={books}
-                    onSaveBook={handleLoansSaveBook}
+                    onSaveBook={handleSaveBook}
                     onClose={() => setLoansOpen(false)}
+                />
+            )}
+
+            {wishlistOpen && (
+                <WishlistModal
+                    books={books}
+                    config={config}
+                    onSaveBook={handleSaveBook}
+                    onClose={() => setWishlistOpen(false)}
+                    isMobile={true}
                 />
             )}
         </div >
