@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { X, Search, Gift, Star, Trash2, CheckCircle2, Plus, RefreshCw, Globe } from 'lucide-react'
+import { X, Search, Gift, Star, Trash2, CheckCircle2, Plus, RefreshCw, Globe, ArrowLeft } from 'lucide-react'
 import { dataService } from '../services/dataService'
 import { Book, Config } from '../types'
 
@@ -43,7 +43,13 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onCl
     const [addQuery, setAddQuery] = useState('')
     const [searchResults, setSearchResults] = useState<Partial<Book>[]>([])
     const [isSearching, setIsSearching] = useState(false)
-    const [addMethod, setAddMethod] = useState<'search' | 'url' | 'isbn'>('search')
+    const [addMethod, setAddMethod] = useState<'search' | 'url' | 'isbn' | 'manual'>('search')
+    const [manualForm, setManualForm] = useState({
+        title: '',
+        authors: '',
+        price: '',
+        notes: ''
+    })
 
     const normalizeText = (text: string) => {
         return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
@@ -94,26 +100,61 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onCl
         if (!addQuery.trim()) return
         setIsSearching(true)
         setSearchResults([])
+
+        const searchOpenLibrary = async (query: string): Promise<Partial<Book>[]> => {
+            try {
+                const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=20`)
+                const data = await res.json()
+                return (data.docs || []).map((doc: any) => ({
+                    isbn: doc.isbn?.[0] || `OL-${Math.random().toString(36).substring(7)}`,
+                    title: doc.title,
+                    authors: doc.author_name || ['Desconocido'],
+                    publisher: doc.publisher?.[0] || '',
+                    description: '',
+                    pageCount: doc.number_of_pages_median || 0,
+                    coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : ''
+                }))
+            } catch (err) {
+                console.error("OpenLibrary error", err)
+                return []
+            }
+        }
+
         try {
             if (addMethod === 'search') {
-                const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(addQuery)}&maxResults=10`)
-                const data = await res.json()
-                const items = data.items || []
-                const results: Partial<Book>[] = items.map((item: any) => {
-                    const info = item.volumeInfo
-                    const isbn = info.industryIdentifiers?.find((id: any) => id.type === 'ISBN_13')?.identifier ||
-                        info.industryIdentifiers?.[0]?.identifier ||
-                        `WISH-${Math.random().toString(36).substring(7)}`
-                    return {
-                        isbn,
-                        title: info.title,
-                        authors: info.authors || ['Desconocido'],
-                        publisher: info.publisher,
-                        description: info.description,
-                        pageCount: info.pageCount,
-                        coverUrl: info.imageLinks?.thumbnail?.replace('http:', 'https:') || ''
+                let results: Partial<Book>[] = []
+                const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(addQuery)}&maxResults=20`)
+
+                if (res.status === 429) {
+                    console.warn("Google 429 - Falling back to OpenLibrary")
+                    results = await searchOpenLibrary(addQuery)
+                    if (results.length === 0) {
+                        alert("Google está limitado y no encontramos resultados en la base alternativa. ¡Prueba el modo 'Manual'!")
                     }
-                })
+                } else {
+                    const data = await res.json()
+                    const items = data.items || []
+                    results = items.map((item: any) => {
+                        const info = item.volumeInfo
+                        const isbn = info.industryIdentifiers?.find((id: any) => id.type === 'ISBN_13')?.identifier ||
+                            info.industryIdentifiers?.[0]?.identifier ||
+                            `WISH-${Math.random().toString(36).substring(7)}`
+                        return {
+                            isbn,
+                            title: info.title,
+                            authors: info.authors || ['Desconocido'],
+                            publisher: info.publisher,
+                            description: info.description,
+                            pageCount: info.pageCount,
+                            coverUrl: info.imageLinks?.thumbnail?.replace('http:', 'https:') || ''
+                        }
+                    })
+
+                    // Si Google no devolvió nada, intentamos OpenLibrary por si acaso
+                    if (results.length === 0) {
+                        results = await searchOpenLibrary(addQuery)
+                    }
+                }
                 setSearchResults(results)
             } else if (addMethod === 'isbn') {
                 const data = await dataService.repairMetadata(addQuery)
@@ -169,302 +210,426 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onCl
                     <button className="close-btn" onClick={onClose} title="Cerrar"><X /></button>
                 </header>
 
-                <div className="modal-body" style={{ flexDirection: isMobile ? 'column' : 'row', padding: isMobile ? '15px' : '30px', flex: 1, overflow: 'hidden' }}>
+                <div className="modal-body" style={{ flexDirection: isMobile ? 'column' : 'row', padding: isMobile ? '15px' : '30px', flex: 1, overflow: 'hidden', position: 'relative' }}>
                     {/* List Column */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '15px', borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)', paddingRight: isMobile ? 0 : '20px', minWidth: isMobile ? '100%' : '300px' }}>
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                            <div className="search-bar" style={{ margin: 0, padding: 0, flex: 1, position: 'relative' }}>
-                                <Search size={18} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
-                                <input
-                                    className="search-input"
-                                    placeholder="Buscar en deseos..."
-                                    value={searchQuery}
-                                    onChange={e => setSearchQuery(e.target.value)}
-                                    style={{ borderRadius: '12px', paddingLeft: '45px', width: '100%', maxWidth: 'none' }}
-                                />
-                            </div>
-                            <button
-                                onClick={() => setIsAddingNew(true)}
-                                style={{
-                                    background: '#8b7ba8',
-                                    color: '#000',
-                                    border: 'none',
-                                    borderRadius: '12px',
-                                    width: '40px',
-                                    height: '40px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    flexShrink: 0
-                                }}
-                                title="Añadir libro externo"
-                            >
-                                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Search size={20} />
-                                    <Plus size={16} strokeWidth={3} style={{ position: 'absolute', bottom: -5, right: -5, background: '#8b7ba8', borderRadius: '50%' }} />
-                                </div>
-                            </button>
-                        </div>
-
-                        <div style={{ flex: 1, overflowY: 'auto' }}>
-                            {wishlistBooks.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-                                    No hay libros en tu lista de deseos.
-                                </div>
-                            ) : (
-                                wishlistBooks.map(book => (
-                                    <div
-                                        key={book.isbn}
-                                        onClick={() => { setSelectedBook(book); setIsAddingNew(false); }}
-                                        style={{
-                                            padding: '12px',
-                                            borderRadius: '12px',
-                                            background: selectedBook?.isbn === book.isbn && !isAddingNew ? 'rgba(139, 123, 168, 0.1)' : 'rgba(255,255,255,0.03)',
-                                            border: `1px solid ${selectedBook?.isbn === book.isbn && !isAddingNew ? '#8b7ba8' : 'rgba(255,255,255,0.05)'}`,
-                                            marginBottom: '8px',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            gap: '12px',
-                                            alignItems: 'center'
-                                        }}
-                                    >
-                                        <div style={{ width: '40px', height: '60px', background: '#1a1a1a', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
-                                            {book.coverPath ? <img src={book.coverPath} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ fontSize: '8px', textAlign: 'center', marginTop: '20px' }}>No Cover</div>}
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontWeight: 'bold', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{book.title}</div>
-                                            <div style={{ fontSize: '0.75rem', color: '#8b7ba8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{book.authors.join(', ')}</div>
-                                            <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                                                {[1, 2, 3].map(s => (
-                                                    <Star key={s} size={10} fill={s <= (book.wishlistPriority || 0) ? '#f59e0b' : 'none'} color={s <= (book.wishlistPriority || 0) ? '#f59e0b' : '#444'} />
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Detail Column */}
-                    <div style={{ flex: 1.5, paddingLeft: isMobile ? 0 : '20px', marginTop: isMobile ? '20px' : 0, overflowY: 'auto' }}>
-                        {isAddingNew ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <h3 style={{ margin: 0 }}>Añadir nuevo deseo</h3>
-                                    <button
-                                        className="close-btn"
-                                        onClick={() => setIsAddingNew(false)}
-                                        style={{
-                                            position: 'static',
-                                            marginLeft: 'auto'
-                                        }}
-                                        title="Cancelar"
-                                    >
-                                        <X />
-                                    </button>
-                                </div>
-
-                                <div style={{ display: 'flex', gap: '5px', background: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '12px' }}>
-                                    {(['search', 'url', 'isbn'] as const).map(m => (
-                                        <button
-                                            key={m}
-                                            onClick={() => { setAddMethod(m); setSearchResults([]); setAddQuery(''); }}
-                                            style={{
-                                                flex: 1,
-                                                padding: '8px',
-                                                borderRadius: '8px',
-                                                border: 'none',
-                                                background: addMethod === m ? 'rgba(139, 123, 168, 0.2)' : 'transparent',
-                                                color: addMethod === m ? '#8b7ba8' : '#888',
-                                                fontSize: '0.8rem',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            {m === 'search' ? 'Por Nombre' : m === 'url' ? 'Por Link' : 'Por ISBN'}
-                                        </button>
-                                    ))}
-                                </div>
-
-                                <div style={{ display: 'flex', gap: '10px', position: 'relative' }}>
-                                    <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
+                    {(!isMobile || (!isAddingNew && !selectedBook)) && (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '15px', borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)', paddingRight: isMobile ? 0 : '20px', minWidth: isMobile ? '100%' : '300px', height: '100%' }}>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                <div className="search-bar" style={{ margin: 0, padding: 0, flex: 1, position: 'relative' }}>
+                                    <Search size={18} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
                                     <input
                                         className="search-input"
-                                        style={{ margin: 0, flex: 1, borderRadius: '8px', paddingLeft: '40px' }}
-                                        placeholder={addMethod === 'search' ? "Título o autor..." : addMethod === 'url' ? "Link de la librería..." : "ISBN de 13 dígitos..."}
-                                        value={addQuery}
-                                        onChange={e => setAddQuery(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && handleSearchExternal()}
+                                        placeholder="Buscar en deseos..."
+                                        value={searchQuery}
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                        style={{ borderRadius: '12px', paddingLeft: '45px', width: '100%', maxWidth: 'none' }}
                                     />
-                                    <button
-                                        onClick={handleSearchExternal}
-                                        disabled={isSearching}
-                                        style={{
-                                            background: '#8b7ba8',
-                                            color: '#000',
-                                            border: 'none',
-                                            borderRadius: '12px',
-                                            width: '45px',
-                                            height: '45px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            cursor: 'pointer',
-                                            flexShrink: 0
-                                        }}
-                                    >
-                                        {isSearching ? <RefreshCw className="spin" style={{ width: 24, height: 24, minWidth: 24, minHeight: 24 }} /> : <Globe style={{ width: 24, height: 24, minWidth: 24, minHeight: 24 }} strokeWidth={2.5} />}
-                                    </button>
                                 </div>
+                                <button
+                                    onClick={() => setIsAddingNew(true)}
+                                    style={{
+                                        background: '#8b7ba8',
+                                        color: '#000',
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        width: '40px',
+                                        height: '40px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        flexShrink: 0
+                                    }}
+                                    title="Añadir libro externo"
+                                >
+                                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Search size={20} />
+                                        <Plus size={16} strokeWidth={3} style={{ position: 'absolute', bottom: -5, right: -5, background: '#8b7ba8', borderRadius: '50%' }} />
+                                    </div>
+                                </button>
+                            </div>
 
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    {searchResults.map((res, i) => (
+                            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '12px' }}>
+                                {wishlistBooks.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                                        No hay libros en tu lista de deseos.
+                                    </div>
+                                ) : (
+                                    wishlistBooks.map(book => (
                                         <div
-                                            key={res.isbn || i}
+                                            key={book.isbn}
+                                            onClick={() => { setSelectedBook(book); setIsAddingNew(false); }}
                                             style={{
-                                                display: 'flex',
-                                                gap: '15px',
                                                 padding: '12px',
-                                                background: 'rgba(255,255,255,0.03)',
                                                 borderRadius: '12px',
-                                                border: '1px solid rgba(255,255,255,0.05)',
+                                                background: selectedBook?.isbn === book.isbn && !isAddingNew ? 'rgba(139, 123, 168, 0.1)' : 'rgba(255,255,255,0.03)',
+                                                border: `1px solid ${selectedBook?.isbn === book.isbn && !isAddingNew ? '#8b7ba8' : 'rgba(255,255,255,0.05)'}`,
+                                                marginBottom: '8px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                gap: '12px',
                                                 alignItems: 'center'
                                             }}
                                         >
-                                            <div style={{ width: '45px', height: '65px', background: '#1a1a1a', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
-                                                {res.coverUrl ? <img src={res.coverUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ fontSize: '8px', textAlign: 'center', marginTop: '20px' }}>-</div>}
+                                            <div style={{ width: '40px', height: '60px', background: '#1a1a1a', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
+                                                {book.coverPath ? <img src={book.coverPath} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ fontSize: '8px', textAlign: 'center', marginTop: '20px' }}>No Cover</div>}
                                             </div>
                                             <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontWeight: 'bold', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{res.title}</div>
-                                                <div style={{ fontSize: '0.75rem', color: '#888' }}>{res.authors?.join(', ')}</div>
+                                                <div style={{ fontWeight: 'bold', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{book.title}</div>
+                                                <div style={{ fontSize: '0.75rem', color: '#8b7ba8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{book.authors.join(', ')}</div>
+                                                <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                                                    {[1, 2, 3].map(s => (
+                                                        <Star key={s} size={10} fill={s <= (book.wishlistPriority || 0) ? '#f59e0b' : 'none'} color={s <= (book.wishlistPriority || 0) ? '#f59e0b' : '#444'} />
+                                                    ))}
+                                                </div>
                                             </div>
-                                            <button
-                                                onClick={() => handleAddAsWish(res)}
-                                                style={{ background: 'rgba(139, 123, 168, 0.1)', color: '#8b7ba8', border: '1px solid rgba(139, 123, 168, 0.2)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer' }}
-                                            >
-                                                Añadir
-                                            </button>
                                         </div>
-                                    ))}
-                                    {searchResults.length === 0 && !isSearching && addQuery && (
-                                        <div style={{ textAlign: 'center', padding: '20px', color: '#444', fontSize: '0.9rem' }}>
-                                            Presiona Enter para buscar datos externos.
-                                        </div>
-                                    )}
-                                </div>
+                                    ))
+                                )}
                             </div>
-                        ) : selectedBook ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                <div style={{ display: 'flex', gap: '20px' }}>
-                                    <div style={{ width: '100px', height: '150px', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', flexShrink: 0 }}>
-                                        {selectedBook.coverPath ? <img src={selectedBook.coverPath} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div className="placeholder-cover">No Cover</div>}
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <h3 style={{ margin: '0 0 5px 0', fontSize: '1.2rem' }}>{selectedBook.title}</h3>
-                                        <p style={{ color: '#8b7ba8', margin: 0, fontWeight: 500 }}>{selectedBook.authors.join(', ')}</p>
+                        </div>
+                    )}
 
-                                        <button
-                                            onClick={() => openGoogleSearch(selectedBook)}
-                                            style={{ marginTop: '15px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '12px', borderRadius: '12px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', width: isMobile ? '100%' : 'auto' }}
-                                        >
-                                            <Globe size={18} /> Buscar en Google
-                                        </button>
-                                    </div>
-                                </div>
+                    {/* Detail Column */}
+                    {(!isMobile || (isAddingNew || selectedBook)) && (
+                        <div style={{ flex: 1.5, paddingLeft: isMobile ? 0 : '20px', paddingRight: isMobile ? '10px' : '15px', marginTop: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                            {isMobile && (
+                                <button
+                                    onClick={() => { setIsAddingNew(false); setSelectedBook(null); }}
+                                    style={{
+                                        alignSelf: 'flex-start',
+                                        background: 'rgba(255,255,255,0.05)',
+                                        border: 'none',
+                                        color: '#8b7ba8',
+                                        padding: '10px 16px',
+                                        borderRadius: '12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        marginBottom: '20px',
+                                        fontSize: '0.95rem',
+                                        cursor: 'pointer',
+                                        fontWeight: '500'
+                                    }}
+                                >
+                                    <ArrowLeft size={20} /> Volver a la lista
+                                </button>
+                            )}
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                                    <div className="input-field">
-                                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#888', marginBottom: '8px' }}>¿Dónde lo viste?</label>
-                                        <input
-                                            className="edit-input"
-                                            value={selectedBook.wishlistLocation || ''}
-                                            onChange={e => handleUpdateWish({ wishlistLocation: e.target.value })}
-                                            placeholder="Tienda o link..."
-                                            style={{ margin: 0 }}
-                                        />
-                                    </div>
-                                    <div className="input-field">
-                                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#888', marginBottom: '8px' }}>Precio estimado</label>
-                                        <input
-                                            className="edit-input"
-                                            value={selectedBook.wishlistPrice || ''}
-                                            onChange={e => handleUpdateWish({ wishlistPrice: e.target.value })}
-                                            placeholder="$..."
-                                            style={{ margin: 0 }}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.8rem', color: '#888', marginBottom: '8px' }}>Prioridad de compra</label>
-                                    <div style={{ display: 'flex', gap: '12px' }}>
-                                        {[1, 2, 3].map(s => (
+                            {isAddingNew ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <h3 style={{ margin: 0 }}>Añadir nuevo deseo</h3>
+                                        {!isMobile && (
                                             <button
-                                                key={s}
-                                                onClick={() => handleUpdateWish({ wishlistPriority: s })}
-                                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                                                className="close-btn"
+                                                onClick={() => setIsAddingNew(false)}
+                                                style={{
+                                                    position: 'static',
+                                                    marginLeft: 'auto'
+                                                }}
+                                                title="Cancelar"
                                             >
-                                                <Star size={28} fill={s <= (selectedBook.wishlistPriority || 0) ? '#f59e0b' : 'none'} color={s <= (selectedBook.wishlistPriority || 0) ? '#f59e0b' : '#333'} />
+                                                <X />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+                                        gap: '5px',
+                                        background: 'rgba(255,255,255,0.03)',
+                                        padding: '4px',
+                                        borderRadius: '12px'
+                                    }}>
+                                        {(['search', 'url', 'isbn', 'manual'] as const).map(m => (
+                                            <button
+                                                key={m}
+                                                onClick={() => { setAddMethod(m); setSearchResults([]); setAddQuery(''); }}
+                                                style={{
+                                                    padding: '8px 4px',
+                                                    borderRadius: '8px',
+                                                    border: 'none',
+                                                    background: addMethod === m ? 'rgba(139, 123, 168, 0.2)' : 'transparent',
+                                                    color: addMethod === m ? '#8b7ba8' : '#888',
+                                                    fontSize: '0.75rem',
+                                                    cursor: 'pointer',
+                                                    textAlign: 'center',
+                                                    whiteSpace: 'nowrap'
+                                                }}
+                                            >
+                                                {m === 'search' ? 'Por Nombre' : m === 'url' ? 'Por Link' : m === 'isbn' ? 'Por ISBN' : 'Manual'}
                                             </button>
                                         ))}
                                     </div>
-                                </div>
 
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.8rem', color: '#888', marginBottom: '8px' }}>Notas / Por qué lo quiero</label>
-                                    <textarea
-                                        className="edit-textarea"
-                                        style={{ minHeight: '100px', margin: 0 }}
-                                        value={selectedBook.wishlistNotes || ''}
-                                        onChange={e => handleUpdateWish({ wishlistNotes: e.target.value })}
-                                        placeholder="Alguna razón especial..."
-                                    />
-                                </div>
-
-                                <div style={{ display: 'flex', gap: '15px', marginTop: 'auto', paddingTop: '10px' }}>
-                                    {!isConverting ? (
-                                        <button
-                                            onClick={() => setIsConverting(true)}
-                                            style={{ flex: 2, background: '#10b981', color: '#000', border: 'none', padding: '14px', borderRadius: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', cursor: 'pointer' }}
-                                        >
-                                            <CheckCircle2 size={20} /> ¡Lo Compré!
-                                        </button>
-                                    ) : (
-                                        <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(16, 185, 129, 0.1)', padding: '15px', borderRadius: '16px', border: '1px solid #10b981' }}>
-                                            <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#10b981' }}>¿A qué biblioteca va?</div>
-                                            <select
-                                                className="edit-input"
-                                                value={targetLibraryId}
-                                                onChange={e => setTargetLibraryId(e.target.value)}
-                                                style={{ margin: 0 }}
-                                            >
-                                                <option value="">(Sin Asignar)</option>
-                                                {config?.libraries.map(l => (
-                                                    <option key={l.id} value={l.id}>{l.name}</option>
-                                                ))}
-                                            </select>
-                                            <div style={{ display: 'flex', gap: '10px' }}>
-                                                <button onClick={handleConvert} style={{ flex: 1, background: '#10b981', border: 'none', color: '#000', padding: '10px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>Confirmar</button>
-                                                <button onClick={() => setIsConverting(false)} style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '10px', borderRadius: '10px', cursor: 'pointer' }}>Cancelar</button>
+                                    {addMethod !== 'manual' ? (
+                                        <>
+                                            <div style={{ display: 'flex', gap: '10px', position: 'relative' }}>
+                                                <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
+                                                <input
+                                                    className="search-input"
+                                                    style={{ margin: 0, flex: 1, borderRadius: '8px', paddingLeft: '40px' }}
+                                                    placeholder={addMethod === 'search' ? "Título o autor..." : addMethod === 'url' ? "Link de la librería..." : "ISBN de 13 dígitos..."}
+                                                    value={addQuery}
+                                                    onChange={e => setAddQuery(e.target.value)}
+                                                    onKeyDown={e => e.key === 'Enter' && handleSearchExternal()}
+                                                />
+                                                <button
+                                                    onClick={handleSearchExternal}
+                                                    disabled={isSearching}
+                                                    style={{
+                                                        background: '#8b7ba8',
+                                                        color: '#000',
+                                                        border: 'none',
+                                                        borderRadius: '12px',
+                                                        width: '45px',
+                                                        height: '45px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        cursor: 'pointer',
+                                                        flexShrink: 0
+                                                    }}
+                                                >
+                                                    {isSearching ? <RefreshCw className="spin" style={{ width: 24, height: 24, minWidth: 24, minHeight: 24 }} /> : <Globe style={{ width: 24, height: 24, minWidth: 24, minHeight: 24 }} strokeWidth={2.5} />}
+                                                </button>
                                             </div>
+
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                {searchResults.map((res, i) => (
+                                                    <div
+                                                        key={res.isbn || i}
+                                                        style={{
+                                                            display: 'flex',
+                                                            gap: '15px',
+                                                            padding: '12px',
+                                                            background: 'rgba(255,255,255,0.03)',
+                                                            borderRadius: '12px',
+                                                            border: '1px solid rgba(255,255,255,0.05)',
+                                                            alignItems: 'center'
+                                                        }}
+                                                    >
+                                                        <div style={{ width: '45px', height: '65px', background: '#1a1a1a', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
+                                                            {res.coverUrl ? <img src={res.coverUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ fontSize: '8px', textAlign: 'center', marginTop: '20px' }}>-</div>}
+                                                        </div>
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ fontWeight: 'bold', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{res.title}</div>
+                                                            <div style={{ fontSize: '0.75rem', color: '#888' }}>{res.authors?.join(', ')}</div>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleAddAsWish(res)}
+                                                            style={{ background: 'rgba(139, 123, 168, 0.1)', color: '#8b7ba8', border: '1px solid rgba(139, 123, 168, 0.2)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer' }}
+                                                        >
+                                                            Añadir
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                {searchResults.length === 0 && !isSearching && addQuery && (
+                                                    <div style={{ textAlign: 'center', padding: '20px', color: '#444', fontSize: '0.9rem' }}>
+                                                        Presiona Enter para buscar datos externos.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                            <div className="input-field">
+                                                <label style={{ display: 'block', fontSize: '0.8rem', color: '#888', marginBottom: '8px' }}>Título</label>
+                                                <input
+                                                    className="edit-input"
+                                                    style={{ margin: 0 }}
+                                                    value={manualForm.title}
+                                                    onChange={e => setManualForm({ ...manualForm, title: e.target.value })}
+                                                    placeholder="Ej: El Resplandor"
+                                                />
+                                            </div>
+                                            <div className="input-field">
+                                                <label style={{ display: 'block', fontSize: '0.8rem', color: '#888', marginBottom: '8px' }}>Autor(es)</label>
+                                                <input
+                                                    className="edit-input"
+                                                    style={{ margin: 0 }}
+                                                    value={manualForm.authors}
+                                                    onChange={e => setManualForm({ ...manualForm, authors: e.target.value })}
+                                                    placeholder="Ej: Stephen King"
+                                                />
+                                            </div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                                                <div className="input-field">
+                                                    <label style={{ display: 'block', fontSize: '0.8rem', color: '#888', marginBottom: '8px' }}>Precio</label>
+                                                    <input
+                                                        className="edit-input"
+                                                        style={{ margin: 0 }}
+                                                        value={manualForm.price}
+                                                        onChange={e => setManualForm({ ...manualForm, price: e.target.value })}
+                                                        placeholder="$..."
+                                                    />
+                                                </div>
+                                                <div className="input-field">
+                                                    <label style={{ display: 'block', fontSize: '0.8rem', color: '#888', marginBottom: '8px' }}>Notas</label>
+                                                    <input
+                                                        className="edit-input"
+                                                        style={{ margin: 0 }}
+                                                        value={manualForm.notes}
+                                                        onChange={e => setManualForm({ ...manualForm, notes: e.target.value })}
+                                                        placeholder="Opcional..."
+                                                    />
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    if (!manualForm.title) return alert('Por favor, ingresa al menos el título')
+                                                    const newWish = {
+                                                        title: manualForm.title,
+                                                        authors: [manualForm.authors || 'Desconocido'],
+                                                        wishlistPrice: manualForm.price,
+                                                        wishlistNotes: manualForm.notes
+                                                    }
+                                                    handleAddAsWish(newWish)
+                                                    setManualForm({ title: '', authors: '', price: '', notes: '' })
+                                                }}
+                                                style={{
+                                                    background: '#8b7ba8',
+                                                    color: '#000',
+                                                    border: 'none',
+                                                    padding: '12px',
+                                                    borderRadius: '12px',
+                                                    fontWeight: 'bold',
+                                                    cursor: 'pointer',
+                                                    marginTop: '10px'
+                                                }}
+                                            >
+                                                Guardar Deseo Manual
+                                            </button>
                                         </div>
                                     )}
-                                    <button
-                                        onClick={() => handleDeleteWish(selectedBook)}
-                                        style={{ flexShrink: 0, background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', width: '50px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                                    >
-                                        <Trash2 size={20} />
-                                    </button>
                                 </div>
-                            </div>
-                        ) : (
-                            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#444', textAlign: 'center' }}>
-                                <Gift size={48} style={{ marginBottom: '15px', opacity: 0.2 }} />
-                                <p>Añade uno nuevo usando <br />el botón "+" de la derecha.</p>
-                            </div>
-                        )}
-                    </div>
+                            ) : selectedBook ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                    <div style={{ display: 'flex', gap: '20px' }}>
+                                        <div style={{ width: '100px', height: '150px', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', flexShrink: 0 }}>
+                                            {selectedBook.coverPath ? <img src={selectedBook.coverPath} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div className="placeholder-cover">No Cover</div>}
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <h3 style={{ margin: '0 0 5px 0', fontSize: '1.2rem' }}>{selectedBook.title}</h3>
+                                            <p style={{ color: '#8b7ba8', margin: 0, fontWeight: 500 }}>{selectedBook.authors.join(', ')}</p>
+
+                                            <button
+                                                onClick={() => openGoogleSearch(selectedBook)}
+                                                style={{ marginTop: '15px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '12px', borderRadius: '12px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', width: isMobile ? '100%' : 'auto' }}
+                                            >
+                                                <Globe size={18} /> Buscar en Google
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                                        <div className="input-field">
+                                            <label style={{ display: 'block', fontSize: '0.8rem', color: '#888', marginBottom: '8px' }}>¿Dónde lo viste?</label>
+                                            <input
+                                                className="edit-input"
+                                                value={selectedBook.wishlistLocation || ''}
+                                                onChange={e => handleUpdateWish({ wishlistLocation: e.target.value })}
+                                                placeholder="Tienda o link..."
+                                                style={{ margin: 0 }}
+                                            />
+                                        </div>
+                                        <div className="input-field">
+                                            <label style={{ display: 'block', fontSize: '0.8rem', color: '#888', marginBottom: '8px' }}>Precio estimado</label>
+                                            <input
+                                                className="edit-input"
+                                                value={selectedBook.wishlistPrice || ''}
+                                                onChange={e => handleUpdateWish({ wishlistPrice: e.target.value })}
+                                                placeholder="$..."
+                                                style={{ margin: 0 }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#888', marginBottom: '8px' }}>Prioridad de compra</label>
+                                        <div style={{ display: 'flex', gap: '12px' }}>
+                                            {[1, 2, 3].map(s => (
+                                                <button
+                                                    key={s}
+                                                    onClick={() => handleUpdateWish({ wishlistPriority: s })}
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                                                >
+                                                    <Star size={28} fill={s <= (selectedBook.wishlistPriority || 0) ? '#f59e0b' : 'none'} color={s <= (selectedBook.wishlistPriority || 0) ? '#f59e0b' : '#333'} />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#888', marginBottom: '8px' }}>Notas / Por qué lo quiero</label>
+                                        <textarea
+                                            className="edit-textarea"
+                                            style={{ minHeight: '100px', margin: 0 }}
+                                            value={selectedBook.wishlistNotes || ''}
+                                            onChange={e => handleUpdateWish({ wishlistNotes: e.target.value })}
+                                            placeholder="Alguna razón especial..."
+                                        />
+                                    </div>
+
+                                    <div style={{ marginTop: 'auto', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                        {!isConverting ? (
+                                            <button
+                                                onClick={() => setIsConverting(true)}
+                                                style={{ width: '100%', background: '#8b7ba8', color: '#000', border: 'none', padding: '14px', borderRadius: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', cursor: 'pointer' }}
+                                            >
+                                                <CheckCircle2 size={20} /> ¡Lo Compré!
+                                            </button>
+                                        ) : (
+                                            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(139, 123, 168, 0.1)', padding: '15px', borderRadius: '16px', border: '1px solid #8b7ba8' }}>
+                                                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#8b7ba8' }}>¿A qué biblioteca va?</div>
+                                                <select
+                                                    className="edit-input"
+                                                    value={targetLibraryId}
+                                                    onChange={e => setTargetLibraryId(e.target.value)}
+                                                    style={{ margin: 0, background: '#1a1a1a', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', maxWidth: '100%', width: isMobile ? '100%' : '280px' }}
+                                                >
+                                                    <option value="" style={{ background: '#1a1a1a', color: '#fff' }}>(Sin Asignar)</option>
+                                                    {config?.libraries.map(l => (
+                                                        <option key={l.id} value={l.id} style={{ background: '#1a1a1a', color: '#fff' }}>{l.name}</option>
+                                                    ))}
+                                                </select>
+                                                <div style={{ display: 'flex', gap: '10px' }}>
+                                                    <button onClick={handleConvert} style={{ flex: 1, background: '#8b7ba8', border: 'none', color: '#000', padding: '12px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>Confirmar</button>
+                                                    <button onClick={() => setIsConverting(false)} style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '12px', borderRadius: '10px', cursor: 'pointer' }}>Cancelar</button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <button
+                                            onClick={() => handleDeleteWish(selectedBook)}
+                                            style={{
+                                                width: '100%',
+                                                background: 'rgba(239, 68, 68, 0.1)',
+                                                color: '#ef4444',
+                                                border: '1px solid rgba(239, 68, 68, 0.2)',
+                                                padding: '12px',
+                                                borderRadius: '14px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '10px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <Trash2 size={20} /> Eliminar de la lista
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#444', textAlign: 'center' }}>
+                                    <Gift size={48} style={{ marginBottom: '15px', opacity: 0.2 }} />
+                                    <p>Añade uno nuevo usando <br />el botón "+" de la derecha.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

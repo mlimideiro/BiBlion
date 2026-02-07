@@ -164,5 +164,135 @@
     "updatedAt": "2026-02-05T03:38:10.923Z",
     "createdAt": "2026-02-05T03:38:10.923Z",
     "libraryId": ""
+  },
+  {
+    "isbn": "OL66BT9C",
+    "title": "Siete casas vacías",
+    "authors": [
+      "Samanta Schweblin"
+    ],
+    "publisher": "",
+    "description": "",
+    "pageCount": 0,
+    "coverPath": "https://covers.openlibrary.org/b/id/7354386-M.jpg",
+    "status": "wishlist",
+    "wishlistPriority": 3,
+    "updatedAt": "2026-02-07T04:53:01.800Z",
+    "createdAt": "2026-02-07T04:52:27.723Z",
+    "libraryId": "",
+    "wishlistPrice": "36000"
+  },
+  {
+    "isbn": "OLOL1OL",
+    "title": "LA VUELTA AL MUNDO EN 80 DIAS",
+    "authors": [
+      "Jules Verne"
+    ],
+    "publisher": "",
+    "description": "",
+    "pageCount": 0,
+    "coverPath": "https://covers.openlibrary.org/b/id/13471433-M.jpg",
+    "status": "available",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-07T04:58:08.119Z",
+    "createdAt": "2026-02-07T04:56:42.817Z",
+    "libraryId": "1769470701100",
+    "wishlistPrice": "30000"
+  },
+  {
+    "isbn": "OLFNOGRF",
+    "title": "The Da Vinci Code",
+    "authors": [
+      "Dan Brown"
+    ],
+    "publisher": "",
+    "description": "",
+    "pageCount": 0,
+    "coverPath": "https://covers.openlibrary.org/b/id/9255229-M.jpg",
+    "status": "wishlist",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-07T05:10:25.121Z",
+    "createdAt": "2026-02-07T05:10:25.121Z",
+    "libraryId": ""
+  },
+  {
+    "isbn": "OLBP9LLP",
+    "title": "El Enigmatico Senor Quin",
+    "authors": [
+      "Agatha Cristie"
+    ],
+    "publisher": "",
+    "description": "",
+    "pageCount": 0,
+    "coverPath": "https://covers.openlibrary.org/b/id/12517437-M.jpg",
+    "status": "wishlist",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-07T05:11:43.826Z",
+    "createdAt": "2026-02-07T05:11:43.826Z",
+    "libraryId": ""
+  },
+  {
+    "isbn": "OLA30MJG",
+    "title": "Pride and Prejudice",
+    "authors": [
+      "Jane Austen"
+    ],
+    "publisher": "",
+    "description": "",
+    "pageCount": 0,
+    "coverPath": "https://covers.openlibrary.org/b/id/14348537-M.jpg",
+    "status": "wishlist",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-07T05:12:05.086Z",
+    "createdAt": "2026-02-07T05:12:05.086Z",
+    "libraryId": ""
+  },
+  {
+    "isbn": "OL6ID2N",
+    "title": "El último secreto",
+    "authors": [
+      "Ted Allbeury"
+    ],
+    "publisher": "",
+    "description": "",
+    "pageCount": 0,
+    "coverPath": "https://covers.openlibrary.org/b/id/11392726-M.jpg",
+    "status": "wishlist",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-07T05:13:39.256Z",
+    "createdAt": "2026-02-07T05:13:39.256Z",
+    "libraryId": ""
+  },
+  {
+    "isbn": "WISH1770441258641",
+    "title": "EL ULTIMO SECRETO",
+    "authors": [
+      "Desconocido"
+    ],
+    "publisher": "",
+    "description": "Venta online de libros, novelas, actualidad, bestsellers, libros infantiles y juveniles, música, películas, artículos de librería, agendas, juegos y juguetes - Libro El Ultimo Secreto - Dan Brown - 9789504992646 - Planeta",
+    "pageCount": 0,
+    "coverPath": "",
+    "status": "wishlist",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-07T05:14:18.644Z",
+    "createdAt": "2026-02-07T05:14:18.644Z",
+    "libraryId": ""
+  },
+  {
+    "isbn": "OL6PJI0M",
+    "title": "The Wild Robot",
+    "authors": [
+      "Peter Brown"
+    ],
+    "publisher": "",
+    "description": "",
+    "pageCount": 0,
+    "coverPath": "https://covers.openlibrary.org/b/id/7443301-M.jpg",
+    "status": "wishlist",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-07T05:26:45.696Z",
+    "createdAt": "2026-02-07T05:26:45.696Z",
+    "libraryId": ""
   }
 ]
