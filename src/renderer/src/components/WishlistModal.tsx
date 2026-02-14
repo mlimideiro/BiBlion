@@ -103,14 +103,17 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onCl
 
         const searchOpenLibrary = async (query: string): Promise<Partial<Book>[]> => {
             try {
-                const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=20`)
+                // Buscamos específicamente en español usando el campo language
+                const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&language=spa&fields=title,author_name,cover_i,publish_year,publisher,number_of_pages_median,isbn&limit=20`)
                 const data = await res.json()
-                return (data.docs || []).map((doc: any) => ({
-                    isbn: doc.isbn?.[0] || `OL-${Math.random().toString(36).substring(7)}`,
+                const docs = data.docs || []
+
+                return docs.map((doc: any) => ({
+                    isbn: doc.isbn?.[0] || `OL-${doc.cover_i || Math.random()}`,
                     title: doc.title,
                     authors: doc.author_name || ['Desconocido'],
                     publisher: doc.publisher?.[0] || '',
-                    description: '',
+                    description: doc.publish_year ? `Publicado en ${doc.publish_year?.[0] || '?'}.` : '',
                     pageCount: doc.number_of_pages_median || 0,
                     coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : ''
                 }))
@@ -122,19 +125,24 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onCl
 
         try {
             if (addMethod === 'search') {
-                let results: Partial<Book>[] = []
-                const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(addQuery)}&maxResults=20`)
+                // Ejecutamos ambas búsquedas en paralelo
+                const [googleRes, openLibResults] = await Promise.allSettled([
+                    fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(addQuery)}&langRestrict=es&maxResults=40`).then(r => r.json()),
+                    searchOpenLibrary(addQuery)
+                ])
 
-                if (res.status === 429) {
-                    console.warn("Google 429 - Falling back to OpenLibrary")
-                    results = await searchOpenLibrary(addQuery)
-                    if (results.length === 0) {
-                        alert("Google está limitado y no encontramos resultados en la base alternativa. ¡Prueba el modo 'Manual'!")
-                    }
-                } else {
-                    const data = await res.json()
-                    const items = data.items || []
-                    results = items.map((item: any) => {
+                let googleResults: Partial<Book>[] = []
+
+                if (googleRes.status === 'fulfilled' && googleRes.value?.items) {
+                    const items = googleRes.value.items || []
+
+                    // Filter by language 'es' if available
+                    let processedItems = items.filter((item: any) => item.volumeInfo.language === 'es')
+
+                    // If no Spanish results found, fall back to showing all to avoid empty list
+                    if (processedItems.length === 0) processedItems = items
+
+                    googleResults = processedItems.map((item: any) => {
                         const info = item.volumeInfo
                         const isbn = info.industryIdentifiers?.find((id: any) => id.type === 'ISBN_13')?.identifier ||
                             info.industryIdentifiers?.[0]?.identifier ||
@@ -149,13 +157,26 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onCl
                             coverUrl: info.imageLinks?.thumbnail?.replace('http:', 'https:') || ''
                         }
                     })
-
-                    // Si Google no devolvió nada, intentamos OpenLibrary por si acaso
-                    if (results.length === 0) {
-                        results = await searchOpenLibrary(addQuery)
-                    }
                 }
-                setSearchResults(results)
+
+                const olResults = openLibResults.status === 'fulfilled' ? openLibResults.value : []
+
+                // Combinamos resultados, priorizando OpenLibrary que tiene mejor filtro de idioma
+                const combinedResults = [...olResults, ...googleResults]
+
+                // Desduplicamos por ISBN o Título similar (simple)
+                const uniqueResults = combinedResults.filter((book, index, self) =>
+                    index === self.findIndex((b) => (
+                        (b.isbn && b.isbn === book.isbn) ||
+                        (b.title === book.title && b.authors?.[0] === book.authors?.[0])
+                    ))
+                )
+
+                if (uniqueResults.length === 0) {
+                    alert("No se encontraron resultados en ninguna de las bases de datos.")
+                }
+
+                setSearchResults(uniqueResults)
             } else if (addMethod === 'isbn') {
                 const data = await dataService.repairMetadata(addQuery)
                 if (data) setSearchResults([{ ...data, isbn: addQuery }])
