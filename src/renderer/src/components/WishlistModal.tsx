@@ -221,6 +221,25 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onCl
 
     return (
         <div className="modal-overlay" onClick={onClose}>
+            <style>
+                {`
+                    @keyframes low-pulse {
+                        0% { background-color: #E1B16A; box-shadow: 0 0 8px rgba(225, 177, 106, 0.4); }
+                        50% { background-color: #c99853; box-shadow: 0 0 20px rgba(225, 177, 106, 0.7); }
+                        100% { background-color: #E1B16A; box-shadow: 0 0 8px rgba(225, 177, 106, 0.4); }
+                    }
+                    @keyframes spin-icon {
+                        from { transform: rotate(0deg); }
+                        to { transform: rotate(360deg); }
+                    }
+                    .spin-animate {
+                        animation: spin-icon 1.5s linear infinite;
+                    }
+                    .btn-searching {
+                        animation: low-pulse 1.5s infinite ease-in-out !important;
+                    }
+                `}
+            </style>
             <div className="modal-content" onClick={e => e.stopPropagation()} style={{
                 maxWidth: isMobile ? '100%' : '900px',
                 height: isMobile ? '100%' : '80vh',
@@ -405,8 +424,9 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onCl
                                                 <button
                                                     onClick={handleSearchExternal}
                                                     disabled={isSearching}
+                                                    className={isSearching ? 'btn-searching' : ''}
                                                     style={{
-                                                        background: '#8b7ba8',
+                                                        background: isSearching ? '#E1B16A' : '#8b7ba8',
                                                         color: '#000',
                                                         border: 'none',
                                                         borderRadius: '12px',
@@ -415,11 +435,12 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onCl
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         justifyContent: 'center',
-                                                        cursor: 'pointer',
-                                                        flexShrink: 0
+                                                        cursor: isSearching ? 'wait' : 'pointer',
+                                                        flexShrink: 0,
+                                                        transition: 'all 0.3s ease'
                                                     }}
                                                 >
-                                                    {isSearching ? <RefreshCw className="spin" style={{ width: 24, height: 24, minWidth: 24, minHeight: 24 }} /> : <Globe style={{ width: 24, height: 24, minWidth: 24, minHeight: 24 }} strokeWidth={2.5} />}
+                                                    {isSearching ? <RefreshCw className="spin-animate" style={{ width: 24, height: 24, minWidth: 24, minHeight: 24 }} /> : <Globe style={{ width: 24, height: 24, minWidth: 24, minHeight: 24 }} strokeWidth={2.5} />}
                                                 </button>
                                             </div>
 
