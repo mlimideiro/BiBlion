@@ -39,9 +39,11 @@ export const dataService = {
         return res.data
     },
 
-    async repairMetadata(isbn: string) {
+    async repairMetadata(isbn: string, title?: string, author?: string) {
         // Metadata repair is essentially lookup on the API
-        const res = await axios.get(`${API_BASE}/lookup/${isbn}`)
+        const res = await axios.get(`${API_BASE}/lookup/${encodeURIComponent(isbn)}`, {
+            params: { title, author }
+        })
         return res.data
     },
 

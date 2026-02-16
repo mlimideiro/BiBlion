@@ -72,7 +72,7 @@ app.whenReady().then(() => {
 
     // Metadata Repair Handler
     ipcMain.handle('repair-metadata', async (_event, isbn) => {
-        const result = await metadataService.fetchByISBN(isbn)
+        const result = await metadataService.lookup(isbn)
         return result
     })
 

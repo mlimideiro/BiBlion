@@ -69,9 +69,14 @@
     "description": "Vincent Van Gogh le escribió a su hermano Theo más de seiscientas cincuenta cartas. En este epistolario, un testimonio desgarrado frente a la vida, Vincent no solo volcó sus ideas sobre la pintura sino también sobre al realidad que lo rodeaba. Las cartas que Vincent Van Gogh le escribió a su hermano Theo desde 1872 en adelante, constituyen una fuente biográfica única e invalorable para conocer los objetivos, pasiones, esperanzas y desilusiones del pintor. Son un testimonio vivido, casi al modo de un diario, en el que el gran artista da cuenta de su cotidianidad así como de su inestable salud física y mental. Después de haber inspirado biografías, películas, obras de teatro, documentales, estudios académicos y miniseries televisivas, estas cartas extraordinarias y conmovedoras se han transformado, a través de los años, en un grito desgarrado frente a la vida, en una utopía sobre la comunidad de artistas, en un gran documento humano que muestra al verdadero Van Gogh, por él mismo.",
     "coverPath": "https://books.google.com/books/content?id=sA7KEAAAQBAJ&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api",
     "createdAt": "2026-01-27T14:21:57.213Z",
-    "updatedAt": "2026-01-28T18:42:50.287Z",
+    "updatedAt": "2026-02-15T23:37:03.146Z",
     "libraryId": "1769470701100",
-    "tags": []
+    "tags": [
+      "virginia"
+    ],
+    "status": "borrowed",
+    "borrowerName": "werwer",
+    "loanDate": "2026-02-15"
   },
   {
     "isbn": "9789877192162",
@@ -159,11 +164,11 @@
     "description": "Año de publicación: 2025. | Género: Arte, cine y fotografía. | Número de páginas: 196. | ISBN: 9786319037654.",
     "pageCount": 0,
     "coverPath": "",
-    "status": "wishlist",
+    "status": "available",
     "wishlistPriority": 2,
-    "updatedAt": "2026-02-05T03:38:10.923Z",
+    "updatedAt": "2026-02-16T04:08:06.928Z",
     "createdAt": "2026-02-05T03:38:10.923Z",
-    "libraryId": ""
+    "libraryId": "1769470701100"
   },
   {
     "isbn": "OL66BT9C",
@@ -175,12 +180,14 @@
     "description": "",
     "pageCount": 0,
     "coverPath": "https://covers.openlibrary.org/b/id/7354386-M.jpg",
-    "status": "wishlist",
+    "status": "borrowed",
     "wishlistPriority": 3,
-    "updatedAt": "2026-02-07T04:53:01.800Z",
+    "updatedAt": "2026-02-15T23:37:41.940Z",
     "createdAt": "2026-02-07T04:52:27.723Z",
     "libraryId": "",
-    "wishlistPrice": "36000"
+    "wishlistPrice": "36000",
+    "borrowerName": "werd",
+    "loanDate": "2026-02-15"
   },
   {
     "isbn": "OLOL1OL",
@@ -209,9 +216,9 @@
     "description": "",
     "pageCount": 0,
     "coverPath": "https://covers.openlibrary.org/b/id/9255229-M.jpg",
-    "status": "wishlist",
+    "status": "available",
     "wishlistPriority": 2,
-    "updatedAt": "2026-02-07T05:10:25.121Z",
+    "updatedAt": "2026-02-16T04:24:19.471Z",
     "createdAt": "2026-02-07T05:10:25.121Z",
     "libraryId": ""
   },
@@ -264,22 +271,6 @@
     "libraryId": ""
   },
   {
-    "isbn": "WISH1770441258641",
-    "title": "EL ULTIMO SECRETO",
-    "authors": [
-      "Desconocido"
-    ],
-    "publisher": "",
-    "description": "Venta online de libros, novelas, actualidad, bestsellers, libros infantiles y juveniles, música, películas, artículos de librería, agendas, juegos y juguetes - Libro El Ultimo Secreto - Dan Brown - 9789504992646 - Planeta",
-    "pageCount": 0,
-    "coverPath": "",
-    "status": "wishlist",
-    "wishlistPriority": 2,
-    "updatedAt": "2026-02-07T05:14:18.644Z",
-    "createdAt": "2026-02-07T05:14:18.644Z",
-    "libraryId": ""
-  },
-  {
     "isbn": "OL6PJI0M",
     "title": "The Wild Robot",
     "authors": [
@@ -294,5 +285,93 @@
     "updatedAt": "2026-02-07T05:26:45.696Z",
     "createdAt": "2026-02-07T05:26:45.696Z",
     "libraryId": ""
+  },
+  {
+    "isbn": "9788417103781",
+    "title": "El Silencio De Las Plantas Elisa Boland Poesía Bajo La Luna - $ 21.999,99",
+    "authors": [
+      "Boland Elisa"
+    ],
+    "publisher": "Bubok",
+    "description": "Año de publicación: 2018 | Con índice: Sí | Tapa del libro: Blanda | Género: Poesia. | Número de páginas: 192. | ISBN: 9789878499123.",
+    "pageCount": 104,
+    "coverPath": "https://http2.mlstatic.com/D_NQ_NP_685611-MLA71602901519_092023-O.webp",
+    "status": "available",
+    "wishlistPriority": 3,
+    "updatedAt": "2026-02-09T14:04:54.897Z",
+    "createdAt": "2026-02-07T16:20:53.887Z",
+    "libraryId": "default",
+    "wishlistPrice": "22000",
+    "wishlistNotes": "Porque si",
+    "coverUrl": "https://books.google.com/books/content?id=P_zvkzy1lgUC&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api"
+  },
+  {
+    "isbn": "WISH1771215702702",
+    "title": "NUNCA DIGAS NUNCA",
+    "authors": [
+      "Desconocido"
+    ],
+    "publisher": "",
+    "description": "",
+    "pageCount": 0,
+    "coverPath": "",
+    "status": "wishlist",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-16T04:21:42.704Z",
+    "createdAt": "2026-02-16T04:21:42.704Z",
+    "libraryId": ""
+  },
+  {
+    "isbn": "1771215702702",
+    "title": "NUNCA DIGAS NUNCA",
+    "authors": [
+      "Desconocido"
+    ],
+    "publisher": "",
+    "description": "",
+    "pageCount": 0,
+    "coverPath": "",
+    "status": "available",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-16T04:21:48.738Z",
+    "createdAt": "2026-02-16T04:21:48.738Z",
+    "libraryId": ""
+  },
+  {
+    "isbn": "WISH9788417977580",
+    "title": "Hamnet",
+    "authors": [
+      "Maggie O'Farrell"
+    ],
+    "publisher": "Batiscafo",
+    "description": "\"Agnes, una muchacha peculiar que parece no rendir cuentas a nadie y que es capaz de crear misteriosos remedios con sencillas combinaciones de plantas, es la comidilla de Stratford, un pequeño pueblo de Inglaterra. Cuando esta conoce a un joven preceptor de latín igual de extraordinario que ella, se da cuenta enseguida de que están llamados a formar una familia. Pero su matrimonio se verá puesto a prueba, primero por sus parientes y después por una inesperada desgracia. Partiendo de la historia familiar de Shakespeare, Maggie O’Farrell transita entre la ficción y la realidad para trazar una hipnótica recreación del suceso que inspiró una de las obras literarias más famosas de todos los tiempos. La autora, lejos de fijarse únicamente en los acontecimientos conocidos, reivindica con ternura las inolvidables figuras que pueblan los márgenes de la historia y ahonda en las pequeñas grandes cuestiones de cualquier existencia: la vida familiar, el afecto, el dolor y la pérdida. El resultado es una inmensa novela que ha cosechado un enorme éxito internacional y confirma a O’Farrell como una de las voces más brillantes de la literatura inglesa actual\" -- Back cover.",
+    "pageCount": 0,
+    "coverPath": "https://books.google.com/books/content?id=xr9jzgEACAAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api",
+    "status": "wishlist",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-16T15:02:42.186Z",
+    "createdAt": "2026-02-16T15:02:42.186Z",
+    "libraryId": ""
+  },
+  {
+    "isbn": "9788417977580",
+    "title": "Hamnet",
+    "authors": [
+      "Maggie O'Farrell"
+    ],
+    "publisher": "Batiscafo",
+    "description": "\"Agnes, una muchacha peculiar que parece no rendir cuentas a nadie y que es capaz de crear misteriosos remedios con sencillas combinaciones de plantas, es la comidilla de Stratford, un pequeño pueblo de Inglaterra. Cuando esta conoce a un joven preceptor de latín igual de extraordinario que ella, se da cuenta enseguida de que están llamados a formar una familia. Pero su matrimonio se verá puesto a prueba, primero por sus parientes y después por una inesperada desgracia. Partiendo de la historia familiar de Shakespeare, Maggie O’Farrell transita entre la ficción y la realidad para trazar una hipnótica recreación del suceso que inspiró una de las obras literarias más famosas de todos los tiempos. La autora, lejos de fijarse únicamente en los acontecimientos conocidos, reivindica con ternura las inolvidables figuras que pueblan los márgenes de la historia y ahonda en las pequeñas grandes cuestiones de cualquier existencia: la vida familiar, el afecto, el dolor y la pérdida. El resultado es una inmensa novela que ha cosechado un enorme éxito internacional y confirma a O’Farrell como una de las voces más brillantes de la literatura inglesa actual\" -- Back cover.",
+    "pageCount": 0,
+    "coverPath": "https://books.google.com/books/content?id=xr9jzgEACAAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api",
+    "status": "available",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-16T15:03:19.609Z",
+    "createdAt": "2026-02-16T15:02:53.546Z",
+    "libraryId": "1769470701100",
+    "coverUrl": "https://books.google.com/books/content?id=xr9jzgEACAAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api",
+    "tags": [
+      "virginia",
+      "marcelo"
+    ]
   }
 ]

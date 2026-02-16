@@ -220,13 +220,26 @@ function App() {
         if (!selectedBook) return
         setRepairing(true)
         try {
-            const data = await dataService.repairMetadata(selectedBook.isbn)
+            const data = await dataService.repairMetadata(selectedBook.isbn, selectedBook.title, selectedBook.authors[0])
             if (data) {
-                const updatedBook = { ...selectedBook, ...data }
+                // If it's a wishlist item, we want to keep the WISH- prefix even after repair
+                // Unless the repair specifically found a better ISBN (which we still prefix with WISH-)
+                let finalIsbn = data.isbn || selectedBook.isbn
+                if (selectedBook.status === 'wishlist' && !finalIsbn.startsWith('WISH-')) {
+                    finalIsbn = `WISH-${finalIsbn}`
+                }
+
+                const updatedBook = { ...selectedBook, ...data, isbn: finalIsbn }
+
+                // If ISBN changed, delete the old record to avoid duplicates
+                if (finalIsbn !== selectedBook.isbn) {
+                    await dataService.deleteBook(currentUser || '', selectedBook.isbn)
+                }
+
                 const updatedBooks = await dataService.saveBook(currentUser || '', updatedBook)
                 setBooks(updatedBooks)
                 setSelectedBook(updatedBook)
-                alert("¡Datos actualizados!")
+                alert("¡Datos completados con éxito!")
             } else {
                 alert("No se encontró información adicional para este libro.")
             }
@@ -268,6 +281,13 @@ function App() {
         if (!selectedBook || !currentUser) return
         try {
             const updatedBook = { ...selectedBook, ...updatedData }
+
+            // If ISBN is changing, we must delete the old record first 
+            // because the backend uses ISBN as the unique key.
+            if (updatedData.isbn && updatedData.isbn !== selectedBook.isbn) {
+                await dataService.deleteBook(currentUser, selectedBook.isbn)
+            }
+
             const updatedBooks = await dataService.saveBook(currentUser, updatedBook)
             setBooks(updatedBooks)
             setSelectedBook(updatedBook)
@@ -573,6 +593,12 @@ function App() {
                                                 placeholder="Autores (separados por coma)"
                                             />
                                             <div className="modal-meta">
+                                                <input
+                                                    className="edit-input"
+                                                    defaultValue={selectedBook.isbn}
+                                                    onBlur={(e) => handleEditSave({ isbn: e.target.value })}
+                                                    placeholder="ISBN del libro"
+                                                />
                                                 <div style={{ display: 'flex', gap: '10px' }}>
                                                     <input
                                                         className="edit-input"

@@ -91,12 +91,21 @@ export function startServer(
 
     app.get('/api/lookup/:isbn', async (req, res) => {
         const { isbn } = req.params
-        console.log('Looking up ISBN:', isbn)
-        const metadata = await metadataService.fetchByISBN(isbn)
-        if (metadata) {
-            res.json(metadata)
-        } else {
-            res.status(404).json({ error: 'Book not found' })
+        const { title, author } = req.query
+        console.log(`[Lookup] ISBN: ${isbn}, Title: ${title || '(none)'}, Author: ${author || '(none)'}`)
+
+        try {
+            const metadata = await metadataService.lookup(isbn, title as string, author as string)
+            if (metadata) {
+                console.log(`[Lookup Success] Found: ${metadata.title}`)
+                res.json(metadata)
+            } else {
+                console.warn(`[Lookup Failed] No results for ISBN: ${isbn}`)
+                res.status(404).json({ error: 'Book not found' })
+            }
+        } catch (error) {
+            console.error('[Lookup Error]', error)
+            res.status(500).json({ error: 'Internal server error during lookup' })
         }
     })
 
@@ -152,10 +161,7 @@ export function startServer(
 
     app.delete('/api/books/:isbn', (req, res) => {
         const { isbn } = req.params
-        const { username } = req.body // Delete usually doesn't have body in some clients, but axios does. Query valid too.
-        // Better use query for delete if body is unreliable? 
-        // Let's try to get from query or body.
-        const user = req.body.username || req.query.username
+        const user = req.body.username || req.query.username || ''
 
         console.log('Deleting book:', isbn, 'user:', user)
         const success = dataManager.deleteBook(user, isbn)

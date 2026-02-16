@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Search, Book as BookIcon, User, HandHelping, RotateCcw } from 'lucide-react'
 import { Book } from '../types'
+import { dataService } from '../services/dataService'
 
 interface Props {
     books: Book[]
@@ -189,14 +190,21 @@ export const LoansModal: React.FC<Props> = ({ books, onSaveBook, onClose }) => {
                                         >
                                             <div style={{
                                                 width: '40px',
-                                                height: '40px',
-                                                borderRadius: '8px',
-                                                background: book.status === 'borrowed' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                                                height: '55px',
+                                                borderRadius: '6px',
+                                                overflow: 'hidden',
+                                                background: '#333',
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                justifyContent: 'center'
+                                                justifyContent: 'center',
+                                                flexShrink: 0,
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
                                             }}>
-                                                <BookIcon size={20} color={book.status === 'borrowed' ? '#f59e0b' : '#10b981'} />
+                                                {dataService.getCoverUrl(book) ? (
+                                                    <img src={dataService.getCoverUrl(book)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    <BookIcon size={20} color={book.status === 'borrowed' ? '#f59e0b' : '#10b981'} />
+                                                )}
                                             </div>
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <div style={{ fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{book.title}</div>
@@ -360,9 +368,9 @@ export const LoansModal: React.FC<Props> = ({ books, onSaveBook, onClose }) => {
                                         borderRadius: '12px',
                                         marginBottom: '10px'
                                     }}>
-                                        <div style={{ width: '40px', height: '55px', borderRadius: '4px', overflow: 'hidden', background: '#333', flexShrink: 0 }}>
-                                            {book.coverUrl ? (
-                                                <img src={book.coverUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        <div style={{ width: '40px', height: '55px', borderRadius: '6px', overflow: 'hidden', background: '#333', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                                            {dataService.getCoverUrl(book) ? (
+                                                <img src={dataService.getCoverUrl(book)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             ) : (
                                                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                     <BookIcon size={16} color="#666" />

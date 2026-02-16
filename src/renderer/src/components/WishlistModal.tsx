@@ -81,6 +81,7 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onCl
         if (!selectedBook) return
         const updated = {
             ...selectedBook,
+            isbn: selectedBook.isbn.replace(/^WISH-/, ''),
             status: 'available' as const,
             libraryId: targetLibraryId || undefined,
             updatedAt: new Date().toISOString()
@@ -178,8 +179,9 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onCl
 
                 setSearchResults(uniqueResults)
             } else if (addMethod === 'isbn') {
-                const data = await dataService.repairMetadata(addQuery)
-                if (data) setSearchResults([{ ...data, isbn: addQuery }])
+                const cleanQuery = addQuery.replace(/[^a-zA-Z0-9]/g, '');
+                const data = await dataService.repairMetadata(cleanQuery)
+                if (data) setSearchResults([{ ...data, isbn: cleanQuery }])
                 else alert('No se encontró información para ese ISBN')
             } else if (addMethod === 'url') {
                 const data = await dataService.scrapeMetadata(addQuery)
@@ -195,8 +197,11 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onCl
     }
 
     const handleAddAsWish = (item: Partial<Book>) => {
+        const isbn = item.isbn || `${Date.now()}`
+        const prefixedIsbn = isbn.startsWith('WISH-') ? isbn : `WISH-${isbn}`
+
         const newWish: Book = {
-            isbn: item.isbn || `WISH-${Date.now()}`,
+            isbn: prefixedIsbn,
             title: item.title || 'Sin Título',
             authors: item.authors || ['Desconocido'],
             publisher: item.publisher || '',

@@ -310,7 +310,7 @@ body {
 
 .modal-body {
     display: flex;
-    padding: 40px;
+    padding: 60px 40px 40px;
     gap: 40px;
     overflow-y: auto;
     overflow-x: hidden;
@@ -350,10 +350,10 @@ body {
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    gap: 10px;
-    padding: 10px 15px 0;
+    gap: 12px;
+    padding: 0;
     position: absolute;
-    top: 0;
+    top: 20px;
     right: 25px;
     z-index: 10;
 }
