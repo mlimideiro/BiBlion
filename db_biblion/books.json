@@ -274,8 +274,11 @@
     "coverPath": "https://books.google.com/books/content?id=etr0DwAAQBAJ&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api",
     "status": "",
     "wishlistPriority": 2,
-    "updatedAt": "2026-02-16T23:58:43.761Z",
+    "updatedAt": "2026-02-17T01:24:37.364Z",
     "createdAt": "2026-02-16T23:58:36.999Z",
-    "libraryId": ""
+    "libraryId": "",
+    "tags": [
+      "vampiros"
+    ]
   }
 ]

@@ -40,6 +40,7 @@ function App() {
     const [repairing, setRepairing] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
     const bookMenuRef = useRef<HTMLDivElement>(null)
+    const tagsRef = useRef<HTMLDivElement>(null)
 
     const THUMB_SIZES = {
         S: { w: '100px', h: '145px' },
@@ -114,6 +115,13 @@ function App() {
         setSearchQuery(query)
     }
 
+    const handleTagSelect = (tag: string | null, event: React.MouseEvent) => {
+        setSelectedTag(tag)
+        // Center the selected tag smoothly
+        const element = event.currentTarget as HTMLElement
+        element.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+    }
+
     // Apply thumbnail size to CSS variables
     useEffect(() => {
         const size = THUMB_SIZES[thumbnailSize]
@@ -131,7 +139,20 @@ function App() {
 
     const handleSaveLibraries = async (libs: Library[], tags: string[]) => {
         if (!config || !currentUser) return
-        const newConfig = { ...config, libraries: libs, tags: tags }
+
+        // Deduplicate tags case-insensitively before saving
+        const uniqueTags: string[] = []
+        const normalizedSet = new Set<string>()
+
+        tags.forEach(tag => {
+            const normalized = tag.trim().toLowerCase()
+            if (!normalizedSet.has(normalized)) {
+                normalizedSet.add(normalized)
+                uniqueTags.push(tag.trim())
+            }
+        })
+
+        const newConfig = { ...config, libraries: libs, tags: uniqueTags }
         // If active library was deleted, fallback to default
         if (!libs.find(l => l.id === newConfig.activeLibraryId)) {
             newConfig.activeLibraryId = 'default'
@@ -261,8 +282,15 @@ function App() {
     const handleAddTagToBook = async (tagName: string) => {
         if (!selectedBook || !currentUser) return
         const currentTags = selectedBook.tags || []
-        if (currentTags.includes(tagName)) return
-        const updatedBook = { ...selectedBook, tags: [...currentTags, tagName] }
+        const normalizedInput = tagName.trim()
+
+        const isDuplicate = currentTags.some(
+            t => t.trim().toLowerCase() === normalizedInput.toLowerCase()
+        )
+
+        if (isDuplicate) return
+
+        const updatedBook = { ...selectedBook, tags: [...currentTags, normalizedInput] }
         const updatedBooks = await dataService.saveBook(currentUser, updatedBook)
         setBooks(updatedBooks)
         setSelectedBook(updatedBook)
@@ -467,10 +495,19 @@ function App() {
 
                 {config && config.tags.length > 0 && (
                     <div className="tags-carousel-wrapper">
-                        <div className="tag-pills-container">
+                        <div
+                            className="tag-pills-container"
+                            ref={tagsRef}
+                            onWheel={(e) => {
+                                if (tagsRef.current) {
+                                    // Translate vertical wheel scroll to horizontal
+                                    tagsRef.current.scrollLeft += e.deltaY;
+                                }
+                            }}
+                        >
                             <div
                                 className={`tag-pill ${selectedTag === null ? 'active' : ''}`}
-                                onClick={() => setSelectedTag(null)}
+                                onClick={(e) => handleTagSelect(null, e)}
                             >
                                 Todos
                             </div>
@@ -478,7 +515,7 @@ function App() {
                                 <div
                                     key={tag}
                                     className={`tag-pill ${selectedTag === tag ? 'active' : ''}`}
-                                    onClick={() => setSelectedTag(tag)}
+                                    onClick={(e) => handleTagSelect(tag, e)}
                                 >
                                     {tag}
                                 </div>

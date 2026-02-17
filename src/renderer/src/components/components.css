@@ -474,9 +474,9 @@ body {
     width: 100%;
     max-width: 900px;
     margin: 10px auto 20px;
-    /* Fade effect on the right */
-    mask-image: linear-gradient(to right, black 90%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+    /* Fade effect on both sides (aggressive 15% fade for visibility) */
+    mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
 }
 
 .tag-pills-container {
@@ -487,14 +487,18 @@ body {
     gap: 10px;
     overflow-x: auto;
     padding: 10px 20px 15px;
-    /* Side padding so the first/last items aren't cut by mask */
     scrollbar-width: none !important;
+    /* Firefox */
     -ms-overflow-style: none !important;
-    justify-content: center;
+    /* IE/Edge */
+    justify-content: flex-start;
+    /* Change from center to allow scroll start from left */
+    scroll-behavior: smooth;
 }
 
 .tag-pills-container::-webkit-scrollbar {
     display: none !important;
+    /* Chrome, Safari, Electron */
 }
 
 .tag-pill {

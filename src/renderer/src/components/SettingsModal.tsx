@@ -32,12 +32,18 @@ export const SettingsModal: React.FC<Props> = ({ libraries, tags, onClose, onSav
     }
 
     const handleAddTag = () => {
-        if (!newTagName.trim()) return
-        if (localTags.includes(newTagName.trim())) {
+        const normalizedInput = newTagName.trim()
+        if (!normalizedInput) return
+
+        const isDuplicate = localTags.some(
+            t => t.trim().toLowerCase() === normalizedInput.toLowerCase()
+        )
+
+        if (isDuplicate) {
             alert('Esta etiqueta ya existe.')
             return
         }
-        setLocalTags([...localTags, newTagName.trim()])
+        setLocalTags([...localTags, normalizedInput])
         setNewTagName('')
     }
 
