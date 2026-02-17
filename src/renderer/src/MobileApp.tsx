@@ -309,6 +309,21 @@ const MobileApp: React.FC = () => {
         }
     }
 
+    const handlePurchaseBook = async (oldIsbn: string, newBook: Book) => {
+        if (!currentUser) return
+        try {
+            // Match WISH with or without hyphen, case-insensitive logic is in WishlistModal
+            // but we ensure atomic deletion and save here too.
+            await dataService.deleteBook(currentUser, oldIsbn)
+            await dataService.saveBook(currentUser, newBook)
+            const updated = await dataService.getBooks(currentUser)
+            setBooks(updated)
+        } catch (e) {
+            console.error("Error purchasing book", e)
+            alert("Error al procesar la compra")
+        }
+    }
+
     const toggleTorch = async () => {
         if (!scannerRef.current || !capabilities?.torch) return
         const newState = !torchOn
@@ -648,6 +663,14 @@ const MobileApp: React.FC = () => {
                     books={books}
                     config={config}
                     onSaveBook={handleSaveBook}
+                    onPurchaseBook={handlePurchaseBook}
+                    onDeleteBook={async (isbn) => {
+                        if (currentUser) {
+                            await dataService.deleteBook(currentUser, isbn)
+                            const updated = await dataService.getBooks(currentUser)
+                            setBooks(updated)
+                        }
+                    }}
                     onClose={() => setWishlistOpen(false)}
                     isMobile={true}
                 />

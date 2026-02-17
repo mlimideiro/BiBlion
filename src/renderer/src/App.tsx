@@ -246,7 +246,8 @@ function App() {
                 // If it's a wishlist item, we want to keep the WISH- prefix even after repair
                 // Unless the repair specifically found a better ISBN (which we still prefix with WISH-)
                 let finalIsbn = data.isbn || selectedBook.isbn
-                if (selectedBook.status === 'wishlist' && !finalIsbn.startsWith('WISH-')) {
+                // Match WISH with or without hyphen, case-insensitive
+                if (selectedBook.status === 'wishlist' && !/^WISH-?/i.test(finalIsbn)) {
                     finalIsbn = `WISH-${finalIsbn}`
                 }
 

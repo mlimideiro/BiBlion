@@ -83,7 +83,7 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onPu
         const oldIsbn = selectedBook.isbn
         const updated = {
             ...selectedBook,
-            isbn: selectedBook.isbn.replace(/^WISH-/, ''),
+            isbn: selectedBook.isbn.replace(/^WISH-?/i, ''),
             status: 'available' as const,
             libraryId: targetLibraryId || undefined,
             updatedAt: new Date().toISOString()
