@@ -279,6 +279,20 @@ function App() {
         setSelectedBook(updatedBook)
     }
 
+    const handlePurchaseBook = async (oldIsbn: string, newBook: Book) => {
+        if (!currentUser) return
+        try {
+            // 1. Delete the wishlist entry (WISH- prefix)
+            await dataService.deleteBook(currentUser, oldIsbn)
+            // 2. Save the new book entry (real ISBN)
+            const updatedBooks = await dataService.saveBook(currentUser, newBook)
+            setBooks(updatedBooks)
+        } catch (e) {
+            console.error("Error purchasing book", e)
+            alert("Error al procesar la compra del libro")
+        }
+    }
+
     const handleAddTagToBook = async (tagName: string) => {
         if (!selectedBook || !currentUser) return
         const currentTags = selectedBook.tags || []
@@ -826,6 +840,7 @@ function App() {
                         books={books}
                         config={config}
                         onSaveBook={handleSaveBook}
+                        onPurchaseBook={handlePurchaseBook}
                         onDeleteBook={(isbn) => {
                             if (currentUser) {
                                 dataService.deleteBook(currentUser, isbn).then(setBooks)

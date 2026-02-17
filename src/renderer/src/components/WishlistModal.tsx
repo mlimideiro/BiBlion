@@ -7,12 +7,13 @@ interface Props {
     books: Book[]
     config: Config | null
     onSaveBook: (book: Book) => void
+    onPurchaseBook: (oldIsbn: string, newBook: Book) => void
     onDeleteBook: (isbn: string) => void
     onClose: () => void
     isMobile?: boolean
 }
 
-export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onDeleteBook, onClose, isMobile }) => {
+export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onPurchaseBook, onDeleteBook, onClose, isMobile }) => {
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedBook, setSelectedBook] = useState<Book | null>(null)
     const [isConverting, setIsConverting] = useState(false)
@@ -79,6 +80,7 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onDe
 
     const handleConvert = () => {
         if (!selectedBook) return
+        const oldIsbn = selectedBook.isbn
         const updated = {
             ...selectedBook,
             isbn: selectedBook.isbn.replace(/^WISH-/, ''),
@@ -86,7 +88,7 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onDe
             libraryId: targetLibraryId || undefined,
             updatedAt: new Date().toISOString()
         }
-        onSaveBook(updated)
+        onPurchaseBook(oldIsbn, updated)
         setSelectedBook(null)
         setIsConverting(false)
         alert('¡Genial! El libro ya está en tu biblioteca.')

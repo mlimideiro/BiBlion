@@ -163,7 +163,8 @@ export class DataManager {
             newBook.isbn = normalizedIsbn
             newBook.createdAt = new Date().toISOString()
             newBook.updatedAt = newBook.createdAt
-            newBook.libraryId = "" // Default to unassigned
+            // Preserve libraryId if provided (important for wishlist conversion)
+            newBook.libraryId = book.libraryId !== undefined ? book.libraryId : ""
             books.push(newBook)
         }
 
