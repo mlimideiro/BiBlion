@@ -745,7 +745,7 @@ function App() {
                                             )}
 
                                             <div className="modal-footer" style={{ border: 'none', padding: '20px 0 20px 0', marginTop: 'auto' }}>
-                                                <button className="repair-btn" onClick={handleRepair} disabled={repairing}>
+                                                <button className={`repair-btn ${repairing ? 'repair-btn-searching' : ''}`} onClick={handleRepair} disabled={repairing}>
                                                     <Sparkles size={18} />
                                                     <span>{repairing ? 'Buscando...' : 'Completar Datos'}</span>
                                                 </button>
@@ -789,6 +789,11 @@ function App() {
                         books={books}
                         config={config}
                         onSaveBook={handleSaveBook}
+                        onDeleteBook={(isbn) => {
+                            if (currentUser) {
+                                dataService.deleteBook(currentUser, isbn).then(setBooks)
+                            }
+                        }}
                         onClose={() => setWishlistOpen(false)}
                     />
                 )

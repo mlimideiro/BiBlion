@@ -755,9 +755,25 @@ body {
     box-shadow: 0 8px 25px var(--accent-glow);
 }
 
-.repair-btn:disabled {
-    opacity: 0.6;
-    cursor: wait;
+@keyframes violet-pulse {
+    0% {
+        background-color: var(--accent);
+        box-shadow: 0 4px 15px var(--accent-glow);
+    }
+
+    50% {
+        background-color: #a291c4;
+        box-shadow: 0 4px 25px rgba(139, 123, 168, 0.6);
+    }
+
+    100% {
+        background-color: var(--accent);
+        box-shadow: 0 4px 15px var(--accent-glow);
+    }
+}
+
+.repair-btn-searching {
+    animation: violet-pulse 1.5s infinite ease-in-out !important;
 }
 
 /* Settings Modal Specifics */
