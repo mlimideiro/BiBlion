@@ -10,6 +10,7 @@ let mainWindow: BrowserWindow | null = null
 const dataManager = new DataManager()
 const metadataService = new MetadataService()
 const scraperService = new ScraperService()
+metadataService.setScraperService(scraperService)
 
 function createWindow() {
     mainWindow = new BrowserWindow({

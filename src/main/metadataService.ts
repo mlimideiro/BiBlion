@@ -1,5 +1,6 @@
 import axios from 'axios'
 import https from 'https'
+import { ScraperService } from './scraperService'
 
 export interface BookMetadata {
     title: string
@@ -12,6 +13,12 @@ export interface BookMetadata {
 }
 
 export class MetadataService {
+    private scraperService: ScraperService | null = null
+
+    setScraperService(scraper: ScraperService) {
+        this.scraperService = scraper
+    }
+
     async lookup(isbn: string, title?: string, author?: string): Promise<BookMetadata | null> {
         const cleanIsbn = this.normalizeIsbn(isbn)
         const searchIsbn = cleanIsbn.toUpperCase()
@@ -20,15 +27,34 @@ export class MetadataService {
 
         // If it looks like a real ISBN, try searching by it
         if (searchIsbn.length >= 10 && searchIsbn.length <= 13 && /^[0-9X]+$/.test(searchIsbn)) {
-            // 1. Try Google Books with ISBN (Spanish preference)
-            book = await this.fetchGoogleBooks(searchIsbn, true)
+            // 1. Try Bookstore Scrapers FIRST (Prioritizing local results and avoiding Google 429)
+            if (this.scraperService) {
+                console.log(`[MetadataService] Attempting Bookstore search FIRST for ISBN: ${searchIsbn}`)
+                const scraped = await this.scraperService.findByIsbn(searchIsbn)
+                if (scraped) {
+                    book = {
+                        title: scraped.title!,
+                        authors: scraped.authors || [],
+                        publisher: scraped.publisher,
+                        pageCount: scraped.pageCount,
+                        description: scraped.description,
+                        coverUrl: scraped.coverPath,
+                        isbn: searchIsbn
+                    }
+                }
+            }
 
-            // 2. If no result, try BNE (Biblioteca Nacional de España)
+            // 2. Try Google Books (Spanish preference) as fallback
+            if (!book) {
+                book = await this.fetchGoogleBooks(searchIsbn, true)
+            }
+
+            // 3. Try BNE (Biblioteca Nacional de España)
             if (!book) {
                 book = await this.fetchBNE(searchIsbn)
             }
 
-            // 3. If no result, try Google Books without language restriction
+            // 4. Try Google Books without language restriction
             if (!book) {
                 book = await this.fetchGoogleBooks(searchIsbn, false)
             }
@@ -141,12 +167,12 @@ export class MetadataService {
             const langParam = esOnly ? '&langRestrict=es' : ''
             // Try with isbn: prefix first
             let url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}${langParam}`
-            let response = await axios.get(url, { timeout: 5000 })
+            let response = await axios.get(url, { timeout: 10000 })
 
             if (response.data.totalItems === 0) {
                 // Try without isbn: prefix as a fallback
                 url = `https://www.googleapis.com/books/v1/volumes?q=${isbn}${langParam}`
-                response = await axios.get(url, { timeout: 5000 })
+                response = await axios.get(url, { timeout: 10000 })
             }
 
             if (response.data.totalItems > 0 && response.data.items?.length > 0) {
@@ -230,7 +256,7 @@ export class MetadataService {
         try {
             const key = `ISBN:${isbn}`
             const url = `https://openlibrary.org/api/books?bibkeys=${key}&format=json&jscmd=data`
-            const response = await axios.get(url, { timeout: 3000 })
+            const response = await axios.get(url, { timeout: 10000 })
 
             if (response.data[key]) {
                 const info = response.data[key]

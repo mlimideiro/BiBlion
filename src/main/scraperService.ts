@@ -1,6 +1,7 @@
 import axios from 'axios'
 
 export interface ScrapedData {
+    isbn?: string
     title?: string
     authors?: string[]
     description?: string
@@ -12,62 +13,238 @@ export interface ScrapedData {
 export class ScraperService {
     public async scrape(url: string): Promise<ScrapedData | null> {
         try {
-            const { data: html } = await axios.get(url, {
+            console.log(`[ScraperService] Scraping URL: ${url}`)
+            const response = await axios.get(url, {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                }
+                },
+                timeout: 10000
             })
+            const html = response.data
+            const finalUrl = response.request?.res?.responseUrl || url
 
-            if (url.includes('cuspide.com')) {
-                return this.parseCuspide(html)
-            }
-            if (url.includes('sbs.com.ar')) {
-                return this.parseSBS(html)
-            }
-            if (url.includes('buscalibre')) {
-                return this.parseBuscalibre(html)
-            }
-            if (url.includes('nordicalibros.com')) {
-                return this.parseNordica(html)
+            let data: ScrapedData = {}
+
+            if (finalUrl.includes('cuspide.com') || finalUrl.includes('galernaweb.com')) {
+                data = this.parseStandardASPX(html, finalUrl)
+            } else if (finalUrl.includes('sbs.com.ar')) {
+                data = this.parseSBS(html)
+            } else if (finalUrl.includes('buscalibre')) {
+                data = this.parseBuscalibre(html)
+            } else if (finalUrl.includes('tematika.com')) {
+                data = this.parseTematika(html)
+            } else if (finalUrl.includes('nordicalibros.com')) {
+                data = this.parseNordica(html)
+            } else {
+                data = this.parseGeneric(html)
             }
 
-            // Universal Fallback (OpenGraph / Meta)
-            return this.parseGeneric(html)
+            // Fallback for missing fields using generic parser
+            if (!data.title || !data.description || !data.coverPath) {
+                const generic = this.parseGeneric(html)
+                if (!data.title) data.title = generic.title
+                if (!data.description) data.description = generic.description
+                if (!data.coverPath) data.coverPath = generic.coverPath
+                if (!data.isbn && generic.isbn) data.isbn = generic.isbn
+            }
+
+            // --- Intelligent Enhancements ---
+
+            // 1. Try JSON-LD if metadata is missing or to confirm ISBN
+            const jsonLdData = this.parseJsonLD(html)
+            if (jsonLdData) {
+                console.log('[ScraperService] Found JSON-LD data')
+                data = { ...jsonLdData, ...data } // Prefer specialized parser for title/author, but JSON-LD is great for others
+                if (jsonLdData.isbn && !data.isbn) data.isbn = jsonLdData.isbn
+            }
+
+            // 2. Extract ISBN from URL if not found in page
+            if (!data.isbn) {
+                const urlIsbn = this.extractIsbnFromUrl(url)
+                if (urlIsbn) {
+                    console.log(`[ScraperService] Extracted ISBN from URL: ${urlIsbn}`)
+                    data.isbn = urlIsbn
+                }
+            }
+
+            // 3. Fallback: Search Body for ISBN patterns if still missing
+            if (!data.isbn) {
+                const bodyIsbn = this.extractIsbnFromHtml(html)
+                if (bodyIsbn) {
+                    console.log(`[ScraperService] Found ISBN in page body: ${bodyIsbn}`)
+                    data.isbn = bodyIsbn
+                }
+            }
+
+            return data
         } catch (error) {
             console.error('[ScraperService] Error scraping URL:', url, error)
             return null
         }
     }
 
-    private parseCuspide(html: string): ScrapedData {
+    public async findByIsbn(isbn: string): Promise<ScrapedData | null> {
+        console.log(`[ScraperService] Searching bookstores for ISBN: ${isbn}`)
+
+        const stores = [
+            { name: 'Buscalibre', url: `https://www.buscalibre.com.ar/libros/search?q=${isbn}` },
+            { name: 'Cuspide', url: `https://www.cuspide.com/resultados.aspx?c=${isbn}&por=isbn` },
+            { name: 'SBS', url: `https://www.sbs.com.ar/resultados.aspx?c=${isbn}&por=isbn` },
+            { name: 'Tematika', url: `https://www.tematika.com/catalogsearch/result/?q=${isbn}` },
+            { name: 'Galerna', url: `https://www.galernaweb.com/resultados.aspx?c=${isbn}&por=isbn` }
+        ]
+
+        for (const store of stores) {
+            try {
+                // Wait briefly between stores to avoid being blocked
+                await new Promise(resolve => setTimeout(resolve, 800))
+
+                const data = await this.scrape(store.url)
+                if (data && this.isValidBookData(data)) {
+                    console.log(`[ScraperService] Found on ${store.name}: ${data.title}`)
+                    return { ...data, isbn }
+                } else if (data) {
+                    console.log(`[ScraperService] ${store.name} returned invalid/error result: ${data.title}`)
+                }
+            } catch (e) {
+                console.warn(`[ScraperService] Error searching ${store.name}:`, e)
+            }
+        }
+
+        return null
+    }
+
+    private isValidBookData(data: ScrapedData): boolean {
+        if (!data.title) return false
+
+        const errorTitles = [
+            'oops', 'no se encontró', 'no se encontro', '404', 'error',
+            'página no encontrada', 'pagina no encontrada', 'sin resultados',
+            'búsqueda', 'busqueda', 'resultados de'
+        ]
+
+        const lowerTitle = data.title.toLowerCase()
+        if (errorTitles.some(et => lowerTitle.includes(et))) return false
+
+        // A valid book from a bookstore search should ideally have an author or ISBN or cover
+        // or a title that doesn't look like a generic search page
+        if (data.title.length < 3) return false
+
+        return true
+    }
+
+    private extractIsbnFromUrl(url: string): string | undefined {
+        // Look for 13 or 10 digit sequences that seem like ISBNs
+        const isbn13Match = url.match(/978\d{10}|979\d{10}/)
+        if (isbn13Match) return isbn13Match[0]
+
+        const isbn10Match = url.match(/\b\d{9}[\dX]\b/)
+        if (isbn10Match) return isbn10Match[0]
+
+        return undefined
+    }
+
+    private extractIsbnFromHtml(html: string): string | undefined {
+        // Common patterns for ISBN label + number
+        // Remove tags for body search to avoid catching IDs in script tags easily
+        const cleanBody = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '')
+
+        const patterns = [
+            /ISBN-13[:\s]+(97[89][-\s]?\d{1,5}[-\s]?\d{1,7}[-\s]?\d{1,6}[-\s]?\d{1})/i,
+            /ISBN[:\s]+(\d{1,5}[-\s]?\d{1,7}[-\s]?\d{1,6}[-\s]?[\dX])/i,
+            /978\d{10}/,
+            /979\d{10}/
+        ]
+
+        for (const pattern of patterns) {
+            const match = cleanBody.match(pattern)
+            if (match) {
+                const clean = match[1] ? match[1].replace(/[-\s]/g, '') : match[0].replace(/[-\s]/g, '')
+                if (clean.length === 10 || clean.length === 13) return clean
+            }
+        }
+        return undefined
+    }
+
+    private parseJsonLD(html: string): ScrapedData | null {
+        try {
+            const matches = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)
+            if (!matches) return null
+
+            for (const scriptTag of matches) {
+                const jsonContent = scriptTag.replace(/<script[^>]*>|<\/script>/gi, '').trim()
+                try {
+                    const json = JSON.parse(jsonContent)
+                    // It can be a single object or an array of objects
+                    const items = Array.isArray(json) ? json : (json['@graph'] || [json])
+
+                    for (const item of items) {
+                        const type = item['@type']
+                        if (type === 'Book' || type === 'Product') {
+                            const data: ScrapedData = {}
+                            if (item.name) data.title = item.name
+                            if (item.description) data.description = item.description
+                            if (item.isbn) data.isbn = String(item.isbn).replace(/[-\s]/g, '')
+                            if (item.publisher?.name) data.publisher = item.publisher.name
+
+                            // Authors can be complex
+                            if (item.author) {
+                                const authors = Array.isArray(item.author) ? item.author : [item.author]
+                                data.authors = authors.map((a: any) => a.name || a).filter(Boolean)
+                            }
+
+                            if (item.image) {
+                                data.coverPath = Array.isArray(item.image) ? item.image[0] : (item.image.url || item.image)
+                            }
+
+                            return data
+                        }
+                    }
+                } catch (e) { /* ignore single invalid script */ }
+            }
+        } catch (e) {
+            console.error('[ScraperService] JSON-LD parse error', e)
+        }
+        return null
+    }
+
+    private parseStandardASPX(html: string, url: string): ScrapedData {
         const data: ScrapedData = {}
+        const domain = new URL(url).origin
 
         // Title
         const titleMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
         if (titleMatch) data.title = this.clean(titleMatch[1])
 
         // Authors
-        const authorMatch = html.match(/<a[^>]*itemprop="author"[^>]*>([\s\S]*?)<\/a>/i)
+        const authorMatch = html.match(/<a[^>]*itemprop="author"[^>]*>([\s\S]*?)<\/a>/i) ||
+            html.match(/Autor:[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i)
         if (authorMatch) data.authors = [this.clean(authorMatch[1])]
 
         // Description
-        const descMatch = html.match(/<div[^>]*class="resumen"[^>]*>([\s\S]*?)<\/div>/i)
+        const descMatch = html.match(/<div[^>]*class="resumen"[^>]*>([\s\S]*?)<\/div>/i) ||
+            html.match(/<div[^>]*id="info"[^>]*>([\s\S]*?)<\/div>/i)
         if (descMatch) data.description = this.clean(descMatch[1])
 
         // Cover
-        const coverMatch = html.match(/<img[^>]*id="imgProducto"[^>]*src="([\s\S]*?)"/i)
-        if (coverMatch) data.coverPath = coverMatch[1].startsWith('http') ? coverMatch[1] : `https://www.cuspide.com${coverMatch[1]}`
-
-        // Meta data (Publisher, Pages)
-        const metaMatch = html.match(/<div[^>]*class="caracteristicas"[^>]*>([\s\S]*?)<\/div>/i)
-        if (metaMatch) {
-            const metaHtml = metaMatch[1]
-            const pubMatch = metaHtml.match(/Editorial:[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i)
-            if (pubMatch) data.publisher = this.clean(pubMatch[1])
-
-            const pagesMatch = metaHtml.match(/Número de páginas:[\s\S]*?<span>([\s\S]*?)<\/span>/i)
-            if (pagesMatch) data.pageCount = parseInt(pagesMatch[1]) || 0
+        const coverMatch = html.match(/<img[^>]*id="imgProducto"[^>]*src="([\s\S]*?)"/i) ||
+            html.match(/<img[^>]*class="foto"[^>]*src="([\s\S]*?)"/i)
+        if (coverMatch) {
+            const src = coverMatch[1]
+            data.coverPath = src.startsWith('http') ? src : `${domain}${src}`
         }
+
+        // Meta data
+        const pubMatch = html.match(/Editorial:[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i) ||
+            html.match(/Editorial:[\s\S]*?<span>([\s\S]*?)<\/span>/i)
+        if (pubMatch) data.publisher = this.clean(pubMatch[1])
+
+        const pagesMatch = html.match(/Número de páginas:[\s\S]*?<span>([\s\S]*?)<\/span>/i) ||
+            html.match(/Páginas:[\s\S]*?<span>([\s\S]*?)<\/span>/i)
+        if (pagesMatch) data.pageCount = parseInt(pagesMatch[1]) || 0
+
+        const isbnMatch = html.match(/ISBN:[\s\S]*?<span>([\s\S]*?)<\/span>/i)
+        if (isbnMatch) data.isbn = this.clean(isbnMatch[1]).replace(/[-\s]/g, '')
 
         return data
     }
@@ -92,25 +269,52 @@ export class ScraperService {
         const pagesMatch = html.match(/Páginas:[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/i)
         if (pagesMatch) data.pageCount = parseInt(pagesMatch[1]) || 0
 
+        const isbnMatch = html.match(/ISBN:[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/i)
+        if (isbnMatch) data.isbn = this.clean(isbnMatch[1]).replace(/[-\s]/g, '')
+
         return data
     }
 
     private parseBuscalibre(html: string): ScrapedData {
         const data: ScrapedData = {}
-        const titleMatch = html.match(/<h1[^>]*itemprop="name"[^>]*>([\s\S]*?)<\/h1>/i)
+        const titleMatch = html.match(/<h1[^>]*itemprop="name"[^>]*>([\s\S]*?)<\/h1>/i) ||
+            html.match(/<h3[^>]*class="nombre"[^>]*>([\s\S]*?)<\/h3>/i)
         if (titleMatch) data.title = this.clean(titleMatch[1])
 
-        const authorMatch = html.match(/<div[^>]*class="autor"[^>]*>([\s\S]*?)<\/div>/i) || html.match(/itemprop="author"[\s\S]*?>([\s\S]*?)<\/a>/i)
+        const authorMatch = html.match(/<div[^>]*class="autor"[^>]*>([\s\S]*?)<\/div>/i) ||
+            html.match(/itemprop="author"[\s\S]*?>([\s\S]*?)<\/a>/i)
         if (authorMatch) data.authors = [this.clean(authorMatch[1])]
 
         const descMatch = html.match(/<div[^>]*id="descripcion"[^>]*>([\s\S]*?)<\/div>/i)
         if (descMatch) data.description = this.clean(descMatch[1])
 
-        const coverMatch = html.match(/<img[^>]*id="primaryimage"[^>]*src="([\s\S]*?)"/i)
+        const coverMatch = html.match(/<img[^>]*id="primaryimage"[^>]*src="([\s\S]*?)"/i) ||
+            html.match(/<img[^>]*class="box-foto"[^>]*src="([\s\S]*?)"/i)
         if (coverMatch) data.coverPath = coverMatch[1]
 
-        const pubMatch = html.match(/Editorial:[\s\S]*?>([\s\S]*?)<\/a>/i)
+        const pubMatch = html.match(/Editorial:[\s\S]*?>([\s\S]*?)<\/a>/i) ||
+            html.match(/data-editorial="([^"]+)"/i)
         if (pubMatch) data.publisher = this.clean(pubMatch[1])
+
+        return data
+    }
+
+    private parseTematika(html: string): ScrapedData {
+        const data: ScrapedData = {}
+        const titleMatch = html.match(/<h1[^>]*class="page-title"[^>]*>([\s\S]*?)<\/h1>/i)
+        if (titleMatch) data.title = this.clean(titleMatch[1])
+
+        const authorMatch = html.match(/<div[^>]*class="author"[^>]*>([\s\S]*?)<\/div>/i)
+        if (authorMatch) data.authors = [this.clean(authorMatch[1])]
+
+        const descMatch = html.match(/<div[^>]*class="description"[^>]*>([\s\S]*?)<\/div>/i)
+        if (descMatch) data.description = this.clean(descMatch[1])
+
+        const coverMatch = html.match(/<img[^>]*class="gallery-placeholder__image"[^>]*src="([\s\S]*?)"/i)
+        if (coverMatch) data.coverPath = coverMatch[1]
+
+        const isbnMatch = html.match(/ISBN:[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/i)
+        if (isbnMatch) data.isbn = this.clean(isbnMatch[1]).replace(/[-\s]/g, '')
 
         return data
     }
@@ -144,6 +348,9 @@ export class ScraperService {
 
         const ogImage = html.match(/<meta[^>]*property="og:image"[^>]*content="([\s\S]*?)"/i)
         if (ogImage) data.coverPath = ogImage[1]
+
+        const ogIsbn = html.match(/<meta[^>]*property="book:isbn"[^>]*content="([\s\S]*?)"/i)
+        if (ogIsbn) data.isbn = this.clean(ogIsbn[1]).replace(/[-\s]/g, '')
 
         // If no title found via OG, try standard <title>
         if (!data.title) {

@@ -345,8 +345,20 @@ function App() {
         try {
             const data = await dataService.scrapeMetadata(scraperUrl)
             if (data && selectedBook) {
-                const updatedBook = { ...selectedBook, ...data }
-                // Persist the changes immediately
+                let finalIsbn = data.isbn || selectedBook.isbn
+
+                // If it's a wishlist item, we want to keep the WISH- prefix
+                if (selectedBook.status === 'wishlist' && finalIsbn && !/^WISH-?/i.test(finalIsbn)) {
+                    finalIsbn = `WISH-${finalIsbn}`
+                }
+
+                const updatedBook = { ...selectedBook, ...data, isbn: finalIsbn }
+
+                // If ISBN changed (e.g. from WISH- placeholder to real), delete old one
+                if (finalIsbn !== selectedBook.isbn) {
+                    await dataService.deleteBook(currentUser, selectedBook.isbn)
+                }
+
                 const updatedBooks = await dataService.saveBook(currentUser, updatedBook)
                 setBooks(updatedBooks)
                 setSelectedBook(updatedBook)

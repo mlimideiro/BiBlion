@@ -280,5 +280,38 @@
     "tags": [
       "vampiros"
     ]
+  },
+  {
+    "isbn": "9788410206175",
+    "title": "Cumbres Borrascosas (colección Jardín Secreto)",
+    "authors": [
+      "Emily Brontë"
+    ],
+    "publisher": "Editorial Alma",
+    "description": "Emily Brontë fue la mediana de las hermanas Brontë y, al igual que Anne y Charlotte, se convirtió en una afamada escritora gracias a su única novela, publicada un año antes de su muerte bajo un seudónimo masculino. Cumbres Borrascosas narra la desgarradora relación entre Catherine y Heathcliff, una historia de amor, pero también de celos, de odio y de venganza.\nAlejada del romanticismo tradicional, la novela supuso toda una revolución en cuanto a su estilo y su estructura, y aunque la crítica del momento le brindó una tibia acogida, el tiempo ha acabado concediéndole el lugar que se merece como uno de los grandes clásicos de la literatura universal.",
+    "pageCount": 0,
+    "coverPath": "",
+    "status": "available",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-18T23:09:42.179Z",
+    "createdAt": "2026-02-18T22:50:43.346Z",
+    "libraryId": "",
+    "coverUrl": "https://images.cdn3.buscalibre.com/fit-in/360x360/e6/a1/e6a1018a120aedf19388a8371e28c301.jpg"
+  },
+  {
+    "isbn": "9788410206632",
+    "title": "Libro Poeta en Nueva York De Federico García Lorca - Buscalibre Argentina",
+    "authors": [
+      "Federico García Lorca"
+    ],
+    "publisher": "Editorial Alma",
+    "description": "Libro Poeta en Nueva York De Federico García Lorca - Buscalibre Argentina - ver opiniones y comentarios. Compra y venta de libros importados, novedades y bestsellers en tu librería Online Buscalibre Argentina y Buscalibros.",
+    "pageCount": 0,
+    "coverPath": "https://images.cdn1.buscalibre.com/fit-in/360x360/17/b8/17b8f40fd6dfa77c6de7cd10a0b8af51.jpg",
+    "status": "available",
+    "wishlistPriority": 2,
+    "updatedAt": "2026-02-18T23:43:33.064Z",
+    "createdAt": "2026-02-18T23:43:33.064Z",
+    "libraryId": ""
   }
 ]

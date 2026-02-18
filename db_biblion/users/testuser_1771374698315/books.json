@@ -1,0 +1,24 @@
+[
+  {
+    "isbn": "123",
+    "title": "Book 1",
+    "authors": [
+      "Author 1"
+    ],
+    "createdAt": "",
+    "updatedAt": "2026-02-18T00:31:38.322Z",
+    "libraryId": "lib1",
+    "status": "borrowed",
+    "borrowerName": "Alice"
+  },
+  {
+    "isbn": "456",
+    "title": "Book 2",
+    "authors": [
+      "Author 2"
+    ],
+    "createdAt": "",
+    "updatedAt": "",
+    "libraryId": "lib2"
+  }
+]

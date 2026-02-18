@@ -7,6 +7,7 @@ import { ScraperService } from './scraperService'
 const dataManager = new DataManager()
 const metadataService = new MetadataService()
 const scraperService = new ScraperService()
+metadataService.setScraperService(scraperService)
 
 console.log('--- BiBlion Cloud Server ---')
 console.log('Initializing services...')
