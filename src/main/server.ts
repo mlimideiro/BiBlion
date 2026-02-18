@@ -111,66 +111,78 @@ export function startServer(
 
     app.post('/api/save', (req, res) => {
         const { username, ...bookData } = req.body
-        console.log('Saving book:', bookData.title, 'for user:', username)
+        console.log(`[Server] Save request for ${username}: "${bookData.title}" (ISBN: ${bookData.isbn})`)
 
-        // If it's a full book object from the library view, it might have libraryId and tags
-        const newBook: Book = {
-            ...bookData,
-            createdAt: bookData.createdAt || new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+        try {
+            // If it's a full book object from the library view, it might have libraryId and tags
+            const newBook: Book = {
+                ...bookData,
+                createdAt: bookData.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            }
+
+            dataManager.saveBook(username, newBook)
+            onBookUpdate(username, newBook)
+
+            // Return ALL books to match Electron behavior and update frontend state
+            const allBooks = dataManager.getAllBooks(username)
+            res.json(allBooks)
+        } catch (error) {
+            console.error(`[Server] Error saving book for ${username}:`, error)
+            res.status(500).json({ error: (error as Error).message })
         }
-
-        dataManager.saveBook(username, newBook)
-        onBookUpdate(username, newBook)
-
-        // Return ALL books to match Electron behavior and update frontend state
-        const allBooks = dataManager.getAllBooks(username)
-        res.json(allBooks)
     })
 
     app.post('/api/bulk-save', (req, res) => {
-        const { username, books } = req.body // Expecting { username, books: [] } or array? Frontend sends array usually? 
-        // Logic check: Frontend usually sends just body. Need to check dataService.
-        // Assuming dataService will be updated to wrap body in {username, ...} or I check if body is array.
-        // If body is array, it's legacy/no-username? No, dataService needs update.
-        // Let's assume body is { username, books: [...] }
+        const { username, books } = req.body
+        console.log(`[Server] Bulk save request for ${username}: ${books?.length} books`)
 
-        console.log('Bulk saving books:', books?.length)
-        if (username && books) {
-            dataManager.saveBooks(username, books)
-            res.json(dataManager.getAllBooks(username))
-        } else {
-            // Fallback for legacy array
-            // const books = req.body
-            // ... legacy handling is tricky here if structure changes. 
-            // Let's assume frontend is updated to send object.
-            res.status(400).json({ error: "Invalid format" })
+        try {
+            if (username && books) {
+                dataManager.saveBooks(username, books)
+                res.json(dataManager.getAllBooks(username))
+            } else {
+                res.status(400).json({ error: "Invalid format: username and books are required" })
+            }
+        } catch (error) {
+            console.error(`[Server] Error in bulk-save for ${username}:`, error)
+            res.status(500).json({ error: (error as Error).message })
         }
     })
 
     app.post('/api/bulk-delete', (req, res) => {
         const { username, isbns } = req.body
-        console.log('Bulk deleting books:', isbns?.length)
-        if (username && isbns) {
-            dataManager.deleteBooks(username, isbns)
-            res.json(dataManager.getAllBooks(username))
-        } else {
-            res.status(400).json({ error: "Invalid format" })
+        console.log(`[Server] Bulk delete request for ${username}: ${isbns?.length} isbns`)
+        try {
+            if (username && isbns) {
+                dataManager.deleteBooks(username, isbns)
+                res.json(dataManager.getAllBooks(username))
+            } else {
+                res.status(400).json({ error: "Invalid format: username and isbns are required" })
+            }
+        } catch (error) {
+            console.error(`[Server] Error in bulk-delete for ${username}:`, error)
+            res.status(500).json({ error: (error as Error).message })
         }
     })
 
     app.delete('/api/books/:isbn', (req, res) => {
         const { isbn } = req.params
-        const user = req.body.username || req.query.username || ''
+        const username = req.body.username || req.query.username || ''
 
-        console.log('Deleting book:', isbn, 'user:', user)
-        const success = dataManager.deleteBook(user, isbn)
+        console.log(`[Server] Delete request for ${username}: ISBN ${isbn}`)
+        try {
+            const success = dataManager.deleteBook(username as string, isbn)
 
-        if (success) {
-            const allBooks = dataManager.getAllBooks(user)
-            res.json(allBooks)
-        } else {
-            res.status(404).json({ error: 'Book not found' })
+            if (success) {
+                const allBooks = dataManager.getAllBooks(username as string)
+                res.json(allBooks)
+            } else {
+                res.status(404).json({ error: 'Book not found' })
+            }
+        } catch (error) {
+            console.error(`[Server] Error deleting book for ${username}:`, error)
+            res.status(500).json({ error: (error as Error).message })
         }
     })
 

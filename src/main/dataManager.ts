@@ -102,14 +102,16 @@ export class DataManager {
     }
 
     public getConfig(username: string): Config {
+        const { config: configFile } = this.getUserPaths(username)
         try {
-            const { config: configFile } = this.getUserPaths(username)
             const config = fs.readJsonSync(configFile) as Config
             // Ensure tags array exists
             if (!config.tags) config.tags = []
             return config
         } catch (error) {
-            console.error('Error reading Config:', error)
+            console.error(`[DataManager] Error reading Config for ${username}:`, error)
+            // If file exists but is corrupted, we might want to know. 
+            // But for config, default is usually safe.
             return {
                 libraries: [{ id: 'default', name: 'Principal' }],
                 activeLibraryId: 'default',
@@ -124,12 +126,17 @@ export class DataManager {
     }
 
     public getAllBooks(username: string): Book[] {
+        const { books: booksFile } = this.getUserPaths(username)
         try {
-            const { books: booksFile } = this.getUserPaths(username)
+            if (!fs.existsSync(booksFile)) {
+                return []
+            }
             return fs.readJsonSync(booksFile) as Book[]
         } catch (error) {
-            console.error('Error reading DB:', error)
-            return []
+            console.error(`[DataManager] CRITICAL: Error reading books.json for ${username}:`, error)
+            // NEVER return [] on read error if the file exists, 
+            // as it would lead callers to overwrite the DB with partial data.
+            throw new Error(`Could not read database for user ${username}. Data integrity preserved.`)
         }
     }
 
@@ -192,6 +199,8 @@ export class DataManager {
     public saveBooks(username: string, booksToSave: Book[]) {
         const { books: booksFile } = this.getUserPaths(username)
         const books = this.getAllBooks(username)
+
+        console.log(`[DataManager] Bulk saving ${booksToSave.length} books for ${username}`)
         this.createBackup(books, username)
 
         let changed = false
@@ -205,13 +214,17 @@ export class DataManager {
                     ...book,
                     libraryId: book.libraryId !== undefined ? book.libraryId : existing.libraryId,
                     tags: book.tags !== undefined ? book.tags : existing.tags,
+                    createdAt: existing.createdAt, // Preserve
                     updatedAt: new Date().toISOString()
                 }
                 changed = true
             } else {
-                const newBook = { ...book, isbn: normalizedIsbn, libraryId: "" }
+                const newBook = { ...book }
+                newBook.isbn = normalizedIsbn
                 newBook.createdAt = new Date().toISOString()
                 newBook.updatedAt = newBook.createdAt
+                // Preserve libraryId if provided
+                newBook.libraryId = book.libraryId !== undefined ? book.libraryId : ""
                 books.push(newBook)
                 changed = true
             }
@@ -219,6 +232,7 @@ export class DataManager {
 
         if (changed) {
             fs.writeJsonSync(booksFile, books, { spaces: 2 })
+            console.log(`[DataManager] Bulk save complete for ${username}. Total books: ${books.length}`)
         }
         return books
     }
