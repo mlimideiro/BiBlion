@@ -60,6 +60,9 @@ app.whenReady().then(() => {
         dataManager.deleteBooks(username, isbns)
         return dataManager.getAllBooks(username)
     })
+    ipcMain.handle('import-books', (_event, { username, books, mode }) => {
+        return dataManager.importBooks(username, books, mode)
+    })
     ipcMain.handle('get-server-info', () => serverInfo)
 
     // Library & Config Handlers

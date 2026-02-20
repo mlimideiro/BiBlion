@@ -39,6 +39,11 @@ export const dataService = {
         return res.data
     },
 
+    async importBooks(username: string, books: Book[], mode: 'merge' | 'replace'): Promise<Book[]> {
+        const res = await axios.post(`${API_BASE}/import`, { username, books, mode })
+        return res.data
+    },
+
     async repairMetadata(isbn: string, title?: string, author?: string) {
         // Metadata repair is essentially lookup on the API
         const res = await axios.get(`${API_BASE}/lookup/${encodeURIComponent(isbn)}`, {

@@ -38,6 +38,11 @@ function App() {
     const [bookMenuOpen, setBookMenuOpen] = useState(false)
     const [selectedBook, setSelectedBook] = useState<Book | null>(null)
     const [repairing, setRepairing] = useState(false)
+    const [importModalOpen, setImportModalOpen] = useState(false)
+    const [importFile, setImportFile] = useState<File | null>(null)
+    const [importBooksCount, setImportBooksCount] = useState(0)
+    const [importing, setImporting] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const menuRef = useRef<HTMLDivElement>(null)
     const bookMenuRef = useRef<HTMLDivElement>(null)
     const tagsRef = useRef<HTMLDivElement>(null)
@@ -174,6 +179,71 @@ function App() {
         document.body.removeChild(link)
         URL.revokeObjectURL(url)
         setMenuOpen(false)
+    }
+
+    const triggerImport = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.click()
+        }
+        setMenuOpen(false)
+    }
+
+    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0]
+        console.log("File selected:", file)
+        if (!file) return
+
+        const reader = new FileReader()
+        reader.onload = (e) => {
+            try {
+                const content = e.target?.result as string
+                console.log("File content length:", content.length)
+                const json = JSON.parse(content)
+                console.log("Parsed JSON array length:", json.length)
+                if (Array.isArray(json)) {
+                    setImportFile(file)
+                    setImportBooksCount(json.length)
+                    setImportModalOpen(true)
+                } else {
+                    alert("El archivo no tiene el formato correcto (debe ser una lista de libros).")
+                }
+            } catch (error) {
+                console.error("Error parsing JSON:", error)
+                alert("Error al leer el archivo JSON.")
+            }
+        }
+        reader.readAsText(file)
+        // Reset input
+        event.target.value = ''
+    }
+
+    const processImport = async (mode: 'merge' | 'replace') => {
+        if (!importFile || !currentUser) {
+            console.error("Missing importFile or currentUser", { importFile, currentUser })
+            return
+        }
+        setImporting(true)
+        console.log("Starting import in mode:", mode)
+        try {
+            const reader = new FileReader()
+            reader.onload = async (e) => {
+                const content = e.target?.result as string
+                const json = JSON.parse(content)
+                console.log("Calling dataService.importBooks...")
+                const updatedBooks = await dataService.importBooks(currentUser, json, mode)
+                console.log("Import success, updated books count:", updatedBooks.length)
+                setBooks(updatedBooks)
+                setImportModalOpen(false)
+                setImportFile(null)
+                alert(`Importación completada con éxito (${mode === 'merge' ? 'Mezclar' : 'Reemplazar'}).`)
+            }
+            reader.readAsText(importFile)
+        } catch (error) {
+            alert("Error durante la importación.")
+            console.error("Import error:", error)
+        } finally {
+            setImporting(false)
+        }
     }
 
     const mobileUrl = 'https://biblion-app.duckdns.org'
@@ -504,10 +574,21 @@ function App() {
                                     </div>
                                     <div className="menu-item" onClick={handleExport}>
                                         <Download size={18} />
-                                        <span>Exportar Backup (JSON)</span>
+                                        <span>Exportar Backup</span>
+                                    </div>
+                                    <div className="menu-item" onClick={triggerImport}>
+                                        <Download size={18} style={{ transform: 'rotate(180deg)' }} />
+                                        <span>Importar Backup</span>
                                     </div>
                                 </div>
                             )}
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                style={{ display: 'none' }}
+                                accept=".json"
+                                onChange={handleFileSelect}
+                            />
                         </div>
                     </div>
                 </div>
@@ -606,6 +687,64 @@ function App() {
                     </div>
                 )
             }
+
+            {importModalOpen && (
+                <div className="modal-overlay" onClick={() => !importing && setImportModalOpen(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                        <div className="modal-header">
+                            <h2>Importar Backup</h2>
+                            {!importing && <button className="close-btn" onClick={() => setImportModalOpen(false)}><X size={20} /></button>}
+                        </div>
+                        <div className="modal-body" style={{ padding: '20px' }}>
+                            <p style={{ marginBottom: '20px' }}>Se encontraron <strong>{importBooksCount}</strong> libros en el archivo seleccionado.</p>
+
+                            <div className="import-options">
+                                <div
+                                    className="import-option"
+                                    onClick={() => !importing && processImport('merge')}
+                                    style={{
+                                        padding: '15px',
+                                        background: 'rgba(255,255,255,0.05)',
+                                        borderRadius: '8px',
+                                        marginBottom: '10px',
+                                        cursor: importing ? 'wait' : 'pointer',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        opacity: importing ? 0.7 : 1
+                                    }}
+                                >
+                                    <h3 style={{ margin: '0 0 5px 0', color: 'var(--accent)' }}>Mezclar (Merge)</h3>
+                                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#ccc' }}>
+                                        Agrega los libros del backup a tu biblioteca actual.
+                                        Si un libro ya existe, se actualizarán sus datos.
+                                        <strong>No se borra nada.</strong>
+                                    </p>
+                                </div>
+
+                                <div
+                                    className="import-option"
+                                    onClick={() => !importing && processImport('replace')}
+                                    style={{
+                                        padding: '15px',
+                                        background: 'rgba(239, 68, 68, 0.1)',
+                                        borderRadius: '8px',
+                                        cursor: importing ? 'wait' : 'pointer',
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        opacity: importing ? 0.7 : 1
+                                    }}
+                                >
+                                    <h3 style={{ margin: '0 0 5px 0', color: '#f87171' }}>Reemplazar (Restore)</h3>
+                                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#ccc' }}>
+                                        ⚠️ <strong>BORRA</strong> toda tu colección actual y la reemplaza con el contenido del backup.
+                                        Úsalo para restaurar una copia exacta.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {importing && <p style={{ textAlign: 'center', marginTop: '15px' }}>Procesando importación...</p>}
+                        </div>
+                    </div>
+                </div>
+            )}
             {
                 selectedBook && (
                     <div className="modal-overlay" onClick={() => { setSelectedBook(null); setIsEditingBook(false); setShowScraperPanel(false); }}>

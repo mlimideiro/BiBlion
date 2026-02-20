@@ -166,6 +166,22 @@ export function startServer(
         }
     })
 
+    app.post('/api/import', (req, res) => {
+        const { username, books, mode } = req.body
+        console.log(`[Server] Import request for ${username}: ${books?.length} books, mode: ${mode}`)
+        try {
+            if (username && books && (mode === 'merge' || mode === 'replace')) {
+                const updatedBooks = dataManager.importBooks(username, books, mode)
+                res.json(updatedBooks)
+            } else {
+                res.status(400).json({ error: "Invalid format: username, books, and valid mode (merge/replace) are required" })
+            }
+        } catch (error) {
+            console.error(`[Server] Error in import for ${username}:`, error)
+            res.status(500).json({ error: (error as Error).message })
+        }
+    })
+
     app.delete('/api/books/:isbn', (req, res) => {
         const { isbn } = req.params
         const username = req.body.username || req.query.username || ''

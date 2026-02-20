@@ -251,6 +251,35 @@ export class DataManager {
         return books
     }
 
+    public importBooks(username: string, importedBooks: Book[], mode: 'merge' | 'replace') {
+        const { books: booksFile } = this.getUserPaths(username)
+        let currentBooks = this.getAllBooks(username)
+
+        console.log(`[DataManager] Importing ${importedBooks.length} books for ${username} in mode: ${mode}`)
+
+        // Always backup first
+        this.createBackup(currentBooks, username)
+
+        // Normalize and reset libraryId to ensure they are visible (unassigned)
+        const preparedBooks = importedBooks.map(book => ({
+            ...book,
+            isbn: this.normalizeIsbn(book.isbn),
+            // Reset libraryId so they appear in "Unassigned"
+            libraryId: "",
+            // Ensure dates exist
+            createdAt: book.createdAt || new Date().toISOString(),
+            updatedAt: book.updatedAt || new Date().toISOString()
+        }))
+
+        if (mode === 'replace') {
+            fs.writeJsonSync(booksFile, preparedBooks, { spaces: 2 })
+            return preparedBooks
+        } else {
+            // Merge mode using existing saveBooks logic which handles updates/inserts
+            return this.saveBooks(username, preparedBooks)
+        }
+    }
+
     private createBackup(books: Book[], username: string) {
         try {
             const date = new Date().toISOString().split('T')[0]
