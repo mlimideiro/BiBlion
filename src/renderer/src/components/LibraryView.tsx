@@ -96,7 +96,7 @@ export const LibraryView: React.FC<Props> = ({
             const data = await dataService.repairMetadata(selectedBook.isbn)
             if (data) {
                 const updatedBook = { ...selectedBook, ...data }
-                const updatedBooks = await dataService.saveBook(updatedBook, currentUser || undefined)
+                const updatedBooks = await dataService.saveBook(currentUser || '', updatedBook)
                 onUpdateBooks(updatedBooks)
                 setSelectedBook(updatedBook)
             }
@@ -110,7 +110,7 @@ export const LibraryView: React.FC<Props> = ({
     const handleDelete = async () => {
         if (!selectedBook) return
         if (window.confirm('¿Eliminar libro?')) {
-            const updatedBooks = await dataService.deleteBook(selectedBook.isbn, currentUser || undefined)
+            const updatedBooks = await dataService.deleteBook(currentUser || '', selectedBook.isbn)
             onUpdateBooks(updatedBooks)
             setSelectedBook(null)
         }
@@ -120,7 +120,7 @@ export const LibraryView: React.FC<Props> = ({
         if (!selectedBook) return
         const updatedBook = { ...selectedBook, libraryId }
         try {
-            const updatedBooks = await dataService.saveBook(updatedBook, currentUser || undefined)
+            const updatedBooks = await dataService.saveBook(currentUser || '', updatedBook)
             onUpdateBooks(updatedBooks)
             setSelectedBook(updatedBook)
         } catch (e) {
@@ -135,7 +135,7 @@ export const LibraryView: React.FC<Props> = ({
 
         const updatedBook = { ...selectedBook, tags: [...currentTags, tag] }
         try {
-            const updatedBooks = await dataService.saveBook(updatedBook, currentUser || undefined)
+            const updatedBooks = await dataService.saveBook(currentUser || '', updatedBook)
             onUpdateBooks(updatedBooks)
             setSelectedBook(updatedBook)
         } catch (e) {
@@ -148,7 +148,7 @@ export const LibraryView: React.FC<Props> = ({
         const currentTags = selectedBook.tags || []
         const updatedBook = { ...selectedBook, tags: currentTags.filter(t => t !== tagToRemove) }
         try {
-            const updatedBooks = await dataService.saveBook(updatedBook, currentUser || undefined)
+            const updatedBooks = await dataService.saveBook(currentUser || '', updatedBook)
             onUpdateBooks(updatedBooks)
             setSelectedBook(updatedBook)
         } catch (e) {
@@ -361,7 +361,7 @@ export const LibraryView: React.FC<Props> = ({
                                 onClick={async () => {
                                     if (!config) return
                                     const newConfig = { ...config, activeLibraryId: "" }
-                                    await dataService.saveConfig(newConfig, currentUser || undefined)
+                                    await dataService.saveConfig(currentUser || '', newConfig)
                                     onUpdateConfig?.(newConfig)
                                     setIsLibrarySelectorOpen(false)
                                 }}
@@ -374,7 +374,7 @@ export const LibraryView: React.FC<Props> = ({
                                 onClick={async () => {
                                     if (!config) return
                                     const newConfig = { ...config, activeLibraryId: 'unassigned' }
-                                    await dataService.saveConfig(newConfig, currentUser || undefined)
+                                    await dataService.saveConfig(currentUser || '', newConfig)
                                     onUpdateConfig?.(newConfig)
                                     setIsLibrarySelectorOpen(false)
                                 }}
@@ -388,7 +388,7 @@ export const LibraryView: React.FC<Props> = ({
                                     className={`action-sheet-item ${config.activeLibraryId === lib.id ? 'active' : ''}`}
                                     onClick={async () => {
                                         const newConfig = { ...config, activeLibraryId: lib.id }
-                                        await dataService.saveConfig(newConfig, currentUser || undefined)
+                                        await dataService.saveConfig(currentUser || '', newConfig)
                                         onUpdateConfig?.(newConfig)
                                         setIsLibrarySelectorOpen(false)
                                     }}

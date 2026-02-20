@@ -321,7 +321,9 @@ function App() {
                     finalIsbn = `WISH-${finalIsbn}`
                 }
 
-                const updatedBook = { ...selectedBook, ...data, isbn: finalIsbn }
+                const { coverUrl, ...restData } = data
+                const finalCoverPath = coverUrl || restData.coverPath || selectedBook.coverPath
+                const updatedBook = { ...selectedBook, ...restData, isbn: finalIsbn, coverPath: finalCoverPath }
 
                 // If ISBN changed, delete the old record to avoid duplicates
                 if (finalIsbn !== selectedBook.isbn) {

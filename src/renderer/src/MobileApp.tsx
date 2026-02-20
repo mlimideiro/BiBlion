@@ -5,7 +5,7 @@ import Tesseract from 'tesseract.js'
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
 import './mobile.css'
-import { ScanBarcode, Library, Image as ImageIcon, Camera, Search, ChevronRight, X, Sparkles, User, HandHelping, Gift } from 'lucide-react'
+import { ScanBarcode, Library, Image as ImageIcon, Camera, Search, ChevronRight, X, Sparkles, User, HandHelping, Gift, RefreshCw } from 'lucide-react'
 import logo from './assets/logo.png'
 import { LibraryView } from './components/LibraryView'
 import { Book, Config } from './types'
@@ -277,9 +277,10 @@ const MobileApp: React.FC = () => {
             for (const book of booksToSave) {
                 // Use dataService to ensure consistent behavior with username
                 // Convert BookMetadata to Book (omitting the internal 'status' field)
-                const { status: _metaStatus, ...bookData } = book as any
+                const { status: _metaStatus, coverUrl, ...bookData } = book as any
                 await dataService.saveBook(currentUser || '', {
                     ...bookData,
+                    coverPath: coverUrl, // Map the coverUrl to coverPath so Desktop can read it
                     status: 'available'
                 } as Book)
             }
@@ -562,10 +563,18 @@ const MobileApp: React.FC = () => {
                 )}
 
                 {mode === 'processing' && (
-                    <div style={{ textAlign: 'center', marginTop: 100 }}>
-                        <div style={{ fontSize: '3rem', animation: 'spin 2s linear infinite' }}>🔄</div>
+                    <div style={{ textAlign: 'center', marginTop: 100, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <RefreshCw className="spin-animate" size={48} color="#E1B16A" />
                         <p style={{ marginTop: 20, fontSize: '1.2rem', color: '#888' }}>Trabajando...</p>
-                        <style>{`@keyframes spin { 100% { transform:rotate(360deg); } }`}</style>
+                        <style>{`
+                            @keyframes spin-icon {
+                                from { transform: rotate(0deg); }
+                                to { transform: rotate(360deg); }
+                            }
+                            .spin-animate {
+                                animation: spin-icon 1.5s linear infinite;
+                            }
+                        `}</style>
                     </div>
                 )}
 

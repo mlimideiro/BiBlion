@@ -120,7 +120,7 @@ export class ScraperService {
         const errorTitles = [
             'oops', 'no se encontró', 'no se encontro', '404', 'error',
             'página no encontrada', 'pagina no encontrada', 'sin resultados',
-            'búsqueda', 'busqueda', 'resultados de'
+            'búsqueda', 'busqueda', 'resultados de', 'resultados.aspx'
         ]
 
         const lowerTitle = data.title.toLowerCase()
