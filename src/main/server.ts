@@ -3,6 +3,7 @@ import cors from 'cors'
 import path from 'path'
 import fs from 'fs'
 import ip from 'ip'
+import axios from 'axios'
 import { DataManager, Book } from './dataManager'
 import { MetadataService } from './metadataService'
 import { ScraperService } from './scraperService'
@@ -215,6 +216,51 @@ export function startServer(
         console.log('Scraping URL:', url)
         const result = await scraperService.scrape(url as string)
         res.json(result)
+    })
+
+    app.get('/api/translate', async (req, res) => {
+        const { text } = req.query
+        if (!text || typeof text !== 'string') return res.status(400).json({ error: 'text is required' })
+
+        try {
+            // Split text into ≤500 char chunks on sentence boundaries
+            const MAX = 490
+            const chunks: string[] = []
+            let remaining = text.trim()
+            while (remaining.length > 0) {
+                if (remaining.length <= MAX) {
+                    chunks.push(remaining)
+                    break
+                }
+                // Try to split at last sentence boundary (. ! ?) before MAX
+                let cutAt = remaining.lastIndexOf('. ', MAX)
+                if (cutAt < 100) cutAt = remaining.lastIndexOf(' ', MAX)
+                if (cutAt < 10) cutAt = MAX
+                chunks.push(remaining.slice(0, cutAt + 1).trim())
+                remaining = remaining.slice(cutAt + 1).trim()
+            }
+
+            const translatedParts: string[] = []
+            for (const chunk of chunks) {
+                const response = await axios.get(`https://api.mymemory.translated.net/get`, {
+                    params: { q: chunk, langpair: 'en|es' },
+                    timeout: 10000
+                })
+                const part = response.data?.responseData?.translatedText
+                if (part) translatedParts.push(part)
+                // Small delay to avoid rate limiting
+                if (chunks.length > 1) await new Promise(r => setTimeout(r, 300))
+            }
+
+            if (translatedParts.length > 0) {
+                res.json({ translated: translatedParts.join(' ') })
+            } else {
+                res.status(500).json({ error: 'Translation returned no result' })
+            }
+        } catch (e: any) {
+            console.error('[Translate] Error:', e.message)
+            res.status(500).json({ error: e.message })
+        }
     })
 
     // User Management Web Endpoints

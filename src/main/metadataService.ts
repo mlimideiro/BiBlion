@@ -44,19 +44,20 @@ export class MetadataService {
                 }
             }
 
-            // 2. Try Google Books (Spanish preference) as fallback
-            if (!book) {
-                book = await this.fetchGoogleBooks(searchIsbn, true)
-            }
-
-            // 3. Try BNE (Biblioteca Nacional de España)
+            // 2. Try BNE (Biblioteca Nacional de España)
             if (!book) {
                 book = await this.fetchBNE(searchIsbn)
             }
 
-            // 4. Try Google Books without language restriction
+            // 3. Try Google Books (Spanish preference) as fallback
             if (!book) {
-                book = await this.fetchGoogleBooks(searchIsbn, false)
+                try {
+                    book = await this.fetchGoogleBooks(searchIsbn, true)
+                } catch (e: any) {
+                    if (e.message === 'GOOGLE_429') {
+                        console.warn('[MetadataService] Google API 429 Timeout hit. Skipping Google Books entirely.')
+                    }
+                }
             }
         }
 
@@ -179,6 +180,9 @@ export class MetadataService {
                 return this.mapGoogleBook(response.data.items[0].volumeInfo)
             }
         } catch (error: any) {
+            if (error.response && error.response.status === 429) {
+                throw new Error('GOOGLE_429')
+            }
             console.warn(`Google Books (ISBN=${isbn}, esOnly=${esOnly}) failed:`, error.message)
         }
         return null

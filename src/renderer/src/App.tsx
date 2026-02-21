@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { BookListItem } from './components/BookListItem'
 import { SearchBar } from './components/SearchBar'
-import { LayoutGrid, Settings, User, HandHelping, X, Download, Gift, Trash2, Sparkles } from 'lucide-react'
+import { LayoutGrid, Settings, User, HandHelping, X, Download, Gift, Trash2, RefreshCw } from 'lucide-react'
 import { SettingsModal } from './components/SettingsModal'
 import { dataService } from './services/dataService'
 import { Book, Config, Library } from './types'
@@ -38,6 +38,8 @@ function App() {
     const [bookMenuOpen, setBookMenuOpen] = useState(false)
     const [selectedBook, setSelectedBook] = useState<Book | null>(null)
     const [repairing, setRepairing] = useState(false)
+    const [translating, setTranslating] = useState(false)
+    const [translatedDescription, setTranslatedDescription] = useState<string | null>(null)
     const [importModalOpen, setImportModalOpen] = useState(false)
     const [importFile, setImportFile] = useState<File | null>(null)
     const [importBooksCount, setImportBooksCount] = useState(0)
@@ -52,6 +54,27 @@ function App() {
         M: { w: '140px', h: '200px' },
         L: { w: '180px', h: '260px' },
         XL: { w: '240px', h: '345px' }
+    }
+
+    // Reset translation when switching books
+    useEffect(() => {
+        setTranslatedDescription(null)
+    }, [selectedBook?.isbn])
+
+    const handleTranslate = async (text: string) => {
+        setTranslating(true)
+        try {
+            const translated = await dataService.translateText(text)
+            if (translated) {
+                setTranslatedDescription(translated)
+                // Persist the translation so it's saved when closing the book
+                await handleEditSave({ description: translated })
+            }
+        } catch (e) {
+            console.error('Translation failed:', e)
+        } finally {
+            setTranslating(false)
+        }
     }
 
     useEffect(() => {
@@ -891,12 +914,49 @@ function App() {
                                                         </select>
                                                     </div>
                                                 </div>
-                                                {selectedBook.description ? (
-                                                    <div className="modal-desc">
-                                                        <h4>Resumen:</h4>
-                                                        <p>{selectedBook.description}</p>
-                                                    </div>
-                                                ) : (
+                                                {selectedBook.description ? (() => {
+                                                    const enWords = [' the ', ' is ', ' of ', ' and ', ' with ', ' for ', ' was ', ' but ', ' this ', ' that ']
+                                                    const lower = (selectedBook.description || '').toLowerCase()
+                                                    const isEnglish = enWords.filter(w => lower.includes(w)).length >= 2
+                                                    const displayDesc = translatedDescription || selectedBook.description
+                                                    return (
+                                                        <div className="modal-desc">
+                                                            <h4 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                Resumen:
+                                                                {isEnglish && !translatedDescription && (
+                                                                    <button
+                                                                        title="Traducir al español"
+                                                                        onClick={() => handleTranslate(selectedBook.description || '')}
+                                                                        disabled={translating}
+                                                                        style={{
+                                                                            background: 'rgba(225, 177, 106, 0.15)',
+                                                                            border: '1px solid rgba(225, 177, 106, 0.4)',
+                                                                            color: '#E1B16A',
+                                                                            borderRadius: '6px',
+                                                                            padding: '2px 10px',
+                                                                            fontSize: '0.75rem',
+                                                                            cursor: translating ? 'wait' : 'pointer',
+                                                                            fontWeight: 600,
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '4px'
+                                                                        }}
+                                                                    >
+                                                                        {translating
+                                                                            ? <RefreshCw size={12} className="spin-animate" />
+                                                                            : '🌐'
+                                                                        }
+                                                                        {translating ? 'Traduciendo...' : 'Traducir'}
+                                                                    </button>
+                                                                )}
+                                                                {translatedDescription && (
+                                                                    <span style={{ fontSize: '0.7rem', color: '#888', fontWeight: 400 }}>traducido</span>
+                                                                )}
+                                                            </h4>
+                                                            <p>{displayDesc}</p>
+                                                        </div>
+                                                    )
+                                                })() : (
                                                     <p className="modal-desc"><em>Sin resumen disponible.</em></p>
                                                 )}
 
@@ -935,7 +995,7 @@ function App() {
 
                                             {showScraperPanel && (
                                                 <div className="scraper-panel">
-                                                    <h4><Sparkles size={16} /> Capturar desde URL</h4>
+                                                    <h4>🔗 Capturar desde URL</h4>
                                                     <div className="scraper-input-group">
                                                         <input
                                                             className="edit-input"
@@ -951,7 +1011,7 @@ function App() {
 
                                             <div className="modal-footer" style={{ border: 'none', padding: '20px 0 20px 0', marginTop: 'auto' }}>
                                                 <button className={`repair-btn ${repairing ? 'repair-btn-searching' : ''}`} onClick={handleRepair} disabled={repairing}>
-                                                    <Sparkles size={18} />
+                                                    <RefreshCw size={18} className={repairing ? 'spin-animate' : ''} />
                                                     <span>{repairing ? 'Buscando...' : 'Completar Datos'}</span>
                                                 </button>
                                                 <button className="action-btn danger" onClick={handleDelete}>

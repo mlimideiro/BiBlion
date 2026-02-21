@@ -57,6 +57,16 @@ export const dataService = {
         return res.data
     },
 
+    async translateText(text: string): Promise<string | null> {
+        try {
+            const res = await axios.get(`${API_BASE}/translate`, { params: { text }, timeout: 10000 })
+            return res.data?.translated || null
+        } catch (e) {
+            console.error('Translation error:', e)
+            return null
+        }
+    },
+
     getCoverUrl(book: Book) {
         if (!book.coverPath) return ''
         if (book.coverPath.startsWith('http')) return book.coverPath

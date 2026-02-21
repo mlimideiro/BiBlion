@@ -35,6 +35,10 @@ export class ScraperService {
                 data = this.parseTematika(html)
             } else if (finalUrl.includes('nordicalibros.com')) {
                 data = this.parseNordica(html)
+            } else if (finalUrl.includes('casadellibro.com')) {
+                data = this.parseCasaDelLibro(html)
+            } else if (finalUrl.includes('lecturalia.com')) {
+                data = this.parseLecturalia(html)
             } else {
                 data = this.parseGeneric(html)
             }
@@ -90,8 +94,10 @@ export class ScraperService {
             { name: 'Buscalibre', url: `https://www.buscalibre.com.ar/libros/search?q=${isbn}` },
             { name: 'Cuspide', url: `https://www.cuspide.com/resultados.aspx?c=${isbn}&por=isbn` },
             { name: 'SBS', url: `https://www.sbs.com.ar/resultados.aspx?c=${isbn}&por=isbn` },
+            { name: 'CasaDelLibro', url: `https://www.casadellibro.com/buscar?q=${isbn}` },
             { name: 'Tematika', url: `https://www.tematika.com/catalogsearch/result/?q=${isbn}` },
-            { name: 'Galerna', url: `https://www.galernaweb.com/resultados.aspx?c=${isbn}&por=isbn` }
+            { name: 'Galerna', url: `https://www.galernaweb.com/resultados.aspx?c=${isbn}&por=isbn` },
+            { name: 'Lecturalia', url: `https://www.lecturalia.com/search?q=${isbn}` }
         ]
 
         for (const store of stores) {
@@ -279,14 +285,25 @@ export class ScraperService {
         const data: ScrapedData = {}
         const titleMatch = html.match(/<h1[^>]*itemprop="name"[^>]*>([\s\S]*?)<\/h1>/i) ||
             html.match(/<h3[^>]*class="nombre"[^>]*>([\s\S]*?)<\/h3>/i)
-        if (titleMatch) data.title = this.clean(titleMatch[1])
+        if (titleMatch) {
+            let title = this.clean(titleMatch[1])
+            // Remove SEO junk: "Libro [Title] De [Author] - Buscalibre Argentina"
+            title = title.replace(/^Libro\s+(.*?)\s+De\s+.*?\s*-\s*Buscalibre.*$/i, '$1').trim()
+            data.title = title
+        }
 
         const authorMatch = html.match(/<div[^>]*class="autor"[^>]*>([\s\S]*?)<\/div>/i) ||
             html.match(/itemprop="author"[\s\S]*?>([\s\S]*?)<\/a>/i)
         if (authorMatch) data.authors = [this.clean(authorMatch[1])]
 
         const descMatch = html.match(/<div[^>]*id="descripcion"[^>]*>([\s\S]*?)<\/div>/i)
-        if (descMatch) data.description = this.clean(descMatch[1])
+        if (descMatch) {
+            let desc = this.clean(descMatch[1])
+            // Remove Buscalibre SEO suffix from descriptions
+            const seoSuffix = /Libro\s+.*?\s+De\s+.*?\s+-\s+Buscalibre.*?$/i
+            desc = desc.replace(seoSuffix, '').trim()
+            data.description = desc
+        }
 
         const coverMatch = html.match(/<img[^>]*id="primaryimage"[^>]*src="([\s\S]*?)"/i) ||
             html.match(/<img[^>]*class="box-foto"[^>]*src="([\s\S]*?)"/i)
@@ -336,6 +353,71 @@ export class ScraperService {
         return data
     }
 
+    private parseCasaDelLibro(html: string): ScrapedData {
+        const data: ScrapedData = {}
+
+        // This targets CasaDelLibro's typical structure, but relies heavily on universal OpenGraph and schema
+        // Title
+        const titleMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || html.match(/<div[^>]*class="title"[^>]*>([\s\S]*?)<\/div>/i)
+        if (titleMatch) data.title = this.clean(titleMatch[1])
+
+        // Author
+        const authorMatch = html.match(/<a[^>]*class="l-text-link l-text-link--standard d-inline-block[^"]*"[^>]*>([\s\S]*?)<\/a>/i) || html.match(/Autor:[\s\S]*?<span>([\s\S]*?)<\/span>/i)
+        if (authorMatch) data.authors = [this.clean(authorMatch[1])]
+
+        // Description
+        const descMatch = html.match(/<div[^>]*class="resume-text"[^>]*>([\s\S]*?)<\/div>/i) || html.match(/<div[^>]*class="synopsis"[^>]*>([\s\S]*?)<\/div>/i)
+        if (descMatch) data.description = this.clean(descMatch[1])
+
+        // Cover
+        const coverMatch = html.match(/<img[^>]*class="picture-image"[^>]*src="([\s\S]*?)"/i) || html.match(/<img[^>]*class="book-image"[^>]*src="([\s\S]*?)"/i)
+        if (coverMatch) data.coverPath = coverMatch[1]
+
+        // Metadata
+        const pubMatch = html.match(/Editorial:[\s\S]*?<span>([\s\S]*?)<\/span>/i)
+        if (pubMatch) data.publisher = this.clean(pubMatch[1])
+
+        const pagesMatch = html.match(/Páginas:[\s\S]*?<span>([\s\S]*?)<\/span>/i) || html.match(/Nº de páginas:[\s\S]*?<span>([\s\S]*?)<\/span>/i)
+        if (pagesMatch) data.pageCount = parseInt(pagesMatch[1]) || 0
+
+        return data
+    }
+
+    private parseLecturalia(html: string): ScrapedData {
+        const data: ScrapedData = {}
+
+        // Title
+        const titleMatch = html.match(/<h1[^>]*class="titl"[^>]*>([\s\S]*?)<\/h1>/i) || html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
+        if (titleMatch) data.title = this.clean(titleMatch[1])
+
+        // Author
+        const authorMatch = html.match(/<h2[^>]*class="au"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>[\s\S]*?<\/h2>/i) || html.match(/<a[^>]*itemprop="author"[^>]*>([\s\S]*?)<\/a>/i)
+        if (authorMatch) data.authors = [this.clean(authorMatch[1])]
+
+        // Description
+        const descMatch = html.match(/<div[^>]*id="sinopsis"[^>]*>([\s\S]*?)<\/div>/i) || html.match(/<div[^>]*class="resumen"[^>]*>([\s\S]*?)<\/div>/i)
+        if (descMatch) data.description = this.clean(descMatch[1])
+
+        // Cover
+        const coverMatch = html.match(/<img[^>]*id="cover"[^>]*src="([\s\S]*?)"/i) || html.match(/<img[^>]*itemprop="image"[^>]*src="([\s\S]*?)"/i)
+        if (coverMatch) {
+            const src = coverMatch[1]
+            data.coverPath = src.startsWith('http') ? src : `https://www.lecturalia.com${src}`
+        }
+
+        // Meta data
+        const pubMatch = html.match(/Editorial:[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i)
+        if (pubMatch) data.publisher = this.clean(pubMatch[1])
+
+        const pagesMatch = html.match(/Páginas:[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/i)
+        if (pagesMatch) data.pageCount = parseInt(pagesMatch[1]) || 0
+
+        const isbnMatch = html.match(/ISBN:[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/i)
+        if (isbnMatch) data.isbn = this.clean(isbnMatch[1]).replace(/[-\s]/g, '')
+
+        return data
+    }
+
     private parseGeneric(html: string): ScrapedData {
         const data: ScrapedData = {}
 
@@ -362,10 +444,28 @@ export class ScraperService {
     }
 
     private clean(text: string): string {
-        return text
+        let cleaned = text
             .replace(/<[^>]*>/g, '') // remove tags
             .replace(/&nbsp;/g, ' ')
             .replace(/\s+/g, ' ')
             .trim()
+
+        // Globally strip common bookstore SEO suffixes from titles/descriptions
+        const seoSpamPatterns = [
+            /\s*[|\-]\s*Tematika\.com[\s\S]*$/i,
+            /\s*[|\-]\s*Cúspide\.com[\s\S]*$/i,
+            /\s*[|\-]\s*Cuspide\.com[\s\S]*$/i,
+            /\s*[|\-]\s*Galerna[\s\S]*$/i,
+            /\s*[|\-]\s*SBS[\s\S]*$/i,
+            /\s*[|\-]\s*Lecturalia[\s\S]*$/i,
+            /\s*[|\-]\s*Casa del Libro[\s\S]*$/i,
+            /\s*[|\-]\s*Buscalibre[\s\S]*$/i
+        ]
+
+        for (const pattern of seoSpamPatterns) {
+            cleaned = cleaned.replace(pattern, '')
+        }
+
+        return cleaned.trim()
     }
 }
