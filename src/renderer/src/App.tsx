@@ -38,6 +38,8 @@ function App() {
     const [bookMenuOpen, setBookMenuOpen] = useState(false)
     const [selectedBook, setSelectedBook] = useState<Book | null>(null)
     const [repairing, setRepairing] = useState(false)
+    const [repairCooldownEnd, setRepairCooldownEnd] = useState(0)
+    const [cooldownRemaining, setCooldownRemaining] = useState(0)
     const [translating, setTranslating] = useState(false)
     const [translatedDescription, setTranslatedDescription] = useState<string | null>(null)
     const [importModalOpen, setImportModalOpen] = useState(false)
@@ -60,6 +62,24 @@ function App() {
     useEffect(() => {
         setTranslatedDescription(null)
     }, [selectedBook?.isbn])
+
+    // Global cooldown timer for repair button
+    useEffect(() => {
+        if (repairCooldownEnd <= Date.now()) {
+            setCooldownRemaining(0)
+            return
+        }
+        const interval = setInterval(() => {
+            const remaining = Math.ceil((repairCooldownEnd - Date.now()) / 1000)
+            if (remaining <= 0) {
+                setCooldownRemaining(0)
+                clearInterval(interval)
+            } else {
+                setCooldownRemaining(remaining)
+            }
+        }, 1000)
+        return () => clearInterval(interval)
+    }, [repairCooldownEnd])
 
     const handleTranslate = async (text: string) => {
         setTranslating(true)
@@ -364,6 +384,10 @@ function App() {
             alert("Error al intentar completar los datos.")
         } finally {
             setRepairing(false)
+            // Start global 25s cooldown
+            const cooldownEnd = Date.now() + 25000
+            setRepairCooldownEnd(cooldownEnd)
+            setCooldownRemaining(25)
         }
     }
 
@@ -1010,9 +1034,9 @@ function App() {
                                             )}
 
                                             <div className="modal-footer" style={{ border: 'none', padding: '20px 0 20px 0', marginTop: 'auto' }}>
-                                                <button className={`repair-btn ${repairing ? 'repair-btn-searching' : ''}`} onClick={handleRepair} disabled={repairing}>
+                                                <button className={`repair-btn ${repairing ? 'repair-btn-searching' : ''}`} onClick={handleRepair} disabled={repairing || cooldownRemaining > 0}>
                                                     <RefreshCw size={18} className={repairing ? 'spin-animate' : ''} />
-                                                    <span>{repairing ? 'Buscando...' : 'Completar Datos'}</span>
+                                                    <span>{repairing ? 'Buscando...' : cooldownRemaining > 0 ? `Reintentar en ${cooldownRemaining}s` : 'Completar Datos'}</span>
                                                 </button>
                                                 <button className="action-btn danger" onClick={handleDelete}>
                                                     <Trash2 size={18} />
