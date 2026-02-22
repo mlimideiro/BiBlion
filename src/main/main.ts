@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import fsExtra from 'fs-extra'
+import axios from 'axios'
 import { DataManager } from './dataManager'
 import { startServer } from './server'
 import { MetadataService } from './metadataService'
@@ -43,9 +45,40 @@ app.whenReady().then(() => {
 
     // IPC Handlers
     // IPC Handlers
+    // Helper: download external cover to per-user local storage (fire & forget)
+    const downloadCoverToLocal = (username: string, isbn: string, coverUrl: string) => {
+        if (!coverUrl || !coverUrl.startsWith('http')) return
+        const cleanIsbn = isbn.replace(/[^a-zA-Z0-9]/g, '')
+        const coversDir = path.join(process.cwd(), 'db_biblion', 'users', username, 'covers')
+        const localFilename = `${cleanIsbn}.jpg`
+        const localPath = path.join(coversDir, localFilename)
+        if (fs.existsSync(localPath)) return
+
+        axios.get(coverUrl, { responseType: 'arraybuffer', timeout: 15000 })
+            .then(response => {
+                fsExtra.ensureDirSync(coversDir)
+                fs.writeFileSync(localPath, Buffer.from(response.data))
+                const books = dataManager.getAllBooks(username)
+                const idx = books.findIndex(b => b.isbn.replace(/[^a-zA-Z0-9]/g, '') === cleanIsbn)
+                if (idx >= 0) {
+                    books[idx].coverUrl = coverUrl  // Preserve original for backup/restore
+                    books[idx].coverPath = `local:${username}:${localFilename}`
+                    const userDir = path.join(process.cwd(), 'db_biblion', 'users', username)
+                    const booksFile = path.join(userDir, 'books.json')
+                    fsExtra.writeJsonSync(booksFile, books, { spaces: 2 })
+                    console.log(`[Cover IPC] Cached locally for ${username}/${cleanIsbn}`)
+                }
+            })
+            .catch(e => console.warn(`[Cover IPC] Download failed for ${isbn}:`, e.message))
+    }
+
     ipcMain.handle('get-books', (_event, username) => dataManager.getAllBooks(username))
     ipcMain.handle('save-book', (_event, { username, book }) => {
         dataManager.saveBook(username, book)
+        // Background cover download
+        if (book.coverPath?.startsWith('http')) {
+            downloadCoverToLocal(username, book.isbn, book.coverPath)
+        }
         return dataManager.getAllBooks(username)
     })
     ipcMain.handle('delete-book', (_event, { username, isbn }) => {
@@ -61,7 +94,21 @@ app.whenReady().then(() => {
         return dataManager.getAllBooks(username)
     })
     ipcMain.handle('import-books', (_event, { username, books, mode }) => {
-        return dataManager.importBooks(username, books, mode)
+        const result = dataManager.importBooks(username, books, mode)
+
+        // Background: re-download covers for imported books that have coverUrl
+        const allBooks = dataManager.getAllBooks(username)
+        let delay = 0
+        for (const book of allBooks) {
+            const url = book.coverUrl || (book.coverPath?.startsWith('http') ? book.coverPath : null)
+            if (url) {
+                setTimeout(() => downloadCoverToLocal(username, book.isbn, url), delay)
+                delay += 500
+            }
+        }
+        if (delay > 0) console.log(`[Import IPC] Queued cover downloads for ${Math.floor(delay / 500)} books`)
+
+        return result
     })
     ipcMain.handle('get-server-info', () => serverInfo)
 

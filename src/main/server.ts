@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import path from 'path'
 import fs from 'fs'
+import fsExtra from 'fs-extra'
 import ip from 'ip'
 import axios from 'axios'
 import { DataManager, Book } from './dataManager'
@@ -80,6 +81,16 @@ export function startServer(
         res.json(config)
     })
 
+    app.get('/api/covers/:username/:filename', (req, res) => {
+        const { username, filename } = req.params
+        const filePath = path.join(process.cwd(), 'db_biblion', 'users', username, 'covers', filename)
+        if (fs.existsSync(filePath)) {
+            res.sendFile(filePath)
+        } else {
+            res.status(404).send('Cover not found')
+        }
+    })
+
     app.get('/api/covers/:filename', (req, res) => {
         const { filename } = req.params
         const filePath = path.join(process.cwd(), 'db_biblion', 'covers', filename)
@@ -110,12 +121,39 @@ export function startServer(
         }
     })
 
+    // Helper: download external cover to per-user local storage (fire & forget)
+    const downloadCoverToLocal = (username: string, isbn: string, coverUrl: string) => {
+        if (!coverUrl || !coverUrl.startsWith('http')) return
+        const cleanIsbn = isbn.replace(/[^a-zA-Z0-9]/g, '')
+        const coversDir = path.join(process.cwd(), 'db_biblion', 'users', username, 'covers')
+        const localFilename = `${cleanIsbn}.jpg`
+        const localPath = path.join(coversDir, localFilename)
+        if (fs.existsSync(localPath)) return // Already cached
+
+        axios.get(coverUrl, { responseType: 'arraybuffer', timeout: 15000 })
+            .then(response => {
+                fsExtra.ensureDirSync(coversDir)
+                fs.writeFileSync(localPath, Buffer.from(response.data))
+                // Update the book: preserve original URL in coverUrl, switch coverPath to local
+                const books = dataManager.getAllBooks(username)
+                const idx = books.findIndex(b => b.isbn.replace(/[^a-zA-Z0-9]/g, '') === cleanIsbn)
+                if (idx >= 0) {
+                    books[idx].coverUrl = coverUrl  // Preserve original for backup/restore
+                    books[idx].coverPath = `local:${username}:${localFilename}`
+                    const userDir = path.join(process.cwd(), 'db_biblion', 'users', username)
+                    const booksFile = path.join(userDir, 'books.json')
+                    fsExtra.writeJsonSync(booksFile, books, { spaces: 2 })
+                    console.log(`[Cover] Cached locally for ${username}/${cleanIsbn}`)
+                }
+            })
+            .catch(e => console.warn(`[Cover] Download failed for ${isbn}:`, e.message))
+    }
+
     app.post('/api/save', (req, res) => {
         const { username, ...bookData } = req.body
         console.log(`[Server] Save request for ${username}: "${bookData.title}" (ISBN: ${bookData.isbn})`)
 
         try {
-            // If it's a full book object from the library view, it might have libraryId and tags
             const newBook: Book = {
                 ...bookData,
                 createdAt: bookData.createdAt || new Date().toISOString(),
@@ -125,7 +163,11 @@ export function startServer(
             dataManager.saveBook(username, newBook)
             onBookUpdate(username, newBook)
 
-            // Return ALL books to match Electron behavior and update frontend state
+            // Background cover download
+            if (newBook.coverPath?.startsWith('http')) {
+                downloadCoverToLocal(username, newBook.isbn, newBook.coverPath)
+            }
+
             const allBooks = dataManager.getAllBooks(username)
             res.json(allBooks)
         } catch (error) {
@@ -174,6 +216,18 @@ export function startServer(
             if (username && books && (mode === 'merge' || mode === 'replace')) {
                 const updatedBooks = dataManager.importBooks(username, books, mode)
                 res.json(updatedBooks)
+
+                // Background: re-download covers for imported books that have coverUrl
+                const allBooks = dataManager.getAllBooks(username)
+                let delay = 0
+                for (const book of allBooks) {
+                    const url = book.coverUrl || (book.coverPath?.startsWith('http') ? book.coverPath : null)
+                    if (url) {
+                        setTimeout(() => downloadCoverToLocal(username, book.isbn, url), delay)
+                        delay += 500 // Stagger downloads to avoid overwhelming servers
+                    }
+                }
+                if (delay > 0) console.log(`[Import] Queued cover downloads for ${Math.floor(delay / 500)} books`)
             } else {
                 res.status(400).json({ error: "Invalid format: username, books, and valid mode (merge/replace) are required" })
             }

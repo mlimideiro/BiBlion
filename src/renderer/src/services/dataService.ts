@@ -71,7 +71,15 @@ export const dataService = {
         if (!book.coverPath) return ''
         if (book.coverPath.startsWith('http')) return book.coverPath
 
-        // Return full API URL for local images
+        // Handle local:username:filename format (per-user cached covers)
+        if (book.coverPath.startsWith('local:')) {
+            const parts = book.coverPath.split(':')
+            const username = parts[1]
+            const filename = parts[2]
+            return `${API_BASE}/covers/${username}/${filename}`
+        }
+
+        // Fallback: legacy global covers
         const filename = book.coverPath.split(/[/\\]/).pop()
         return `${API_BASE}/covers/${filename}`
     }

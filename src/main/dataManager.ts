@@ -10,6 +10,7 @@ export interface Book {
     pageCount?: number
     description?: string
     coverPath?: string
+    coverUrl?: string  // Original HTTP URL preserved for backup/restore
     createdAt: string
     updatedAt: string
     libraryId?: string // Which library it belongs to
