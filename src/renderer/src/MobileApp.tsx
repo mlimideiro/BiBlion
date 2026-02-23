@@ -40,6 +40,7 @@ const MobileApp: React.FC = () => {
     const [manualIsbn, setManualIsbn] = useState('')
     const [loansOpen, setLoansOpen] = useState(false)
     const [wishlistOpen, setWishlistOpen] = useState(false)
+    const [accountMenuOpen, setAccountMenuOpen] = useState(false)
     const scannerRef = useRef<Html5Qrcode | null>(null)
     const lastScannedIsbn = useRef<string | null>(null)
     const scanTimeout = useRef<any>(null)
@@ -368,6 +369,15 @@ const MobileApp: React.FC = () => {
         }
     }
 
+    const handleLogout = () => {
+        localStorage.removeItem('biblion_user')
+        localStorage.removeItem('biblion_role')
+        localStorage.removeItem('biblion_is_admin')
+        setCurrentUser(null)
+        setIsLoggedIn(false)
+        setAccountMenuOpen(false)
+    }
+
     if (!isLoggedIn) {
         return <Login onLogin={(user) => {
             localStorage.setItem('biblion_user', user)
@@ -390,9 +400,12 @@ const MobileApp: React.FC = () => {
             </header>
 
             {currentUser && mode === 'idle' && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#cdd6f4', marginTop: '8px', marginBottom: '-5px' }}>
+                <div
+                    className="mobile-account-trigger"
+                    onClick={() => setAccountMenuOpen(true)}
+                >
                     <User size={24} />
-                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', lineHeight: '1' }}>{currentUser}</span>
+                    <span>{currentUser}</span>
                 </div>
             )}
 
@@ -683,6 +696,35 @@ const MobileApp: React.FC = () => {
                     onClose={() => setWishlistOpen(false)}
                     isMobile={true}
                 />
+            )}
+
+            {/* Account Bottom Sheet */}
+            {accountMenuOpen && (
+                <div className="bottom-sheet-overlay" onClick={() => setAccountMenuOpen(false)}>
+                    <div className="bottom-sheet" onClick={e => e.stopPropagation()}>
+                        <div className="bottom-sheet-handle"></div>
+                        <div className="bottom-sheet-header">
+                            <div className="user-info-large">
+                                <div className="user-avatar-placeholder">
+                                    <User size={32} />
+                                </div>
+                                <div className="user-details">
+                                    <h3>{currentUser}</h3>
+                                    <p>Usuario de BiBlion</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bottom-sheet-body">
+                            <button className="bottom-sheet-btn danger" onClick={handleLogout}>
+                                <RefreshCw size={20} />
+                                <span>Cerrar Sesión</span>
+                            </button>
+                            <button className="bottom-sheet-btn secondary" onClick={() => setAccountMenuOpen(false)}>
+                                <span>Cancelar</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div >
     )

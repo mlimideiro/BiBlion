@@ -9,11 +9,12 @@ interface Library {
 interface Props {
     libraries: Library[]
     tags: string[]
+    activeView: 'libraries' | 'tags'
     onClose: () => void
     onSave: (libs: Library[], tags: string[]) => void
 }
 
-export const SettingsModal: React.FC<Props> = ({ libraries, tags, onClose, onSave }) => {
+export const SettingsModal: React.FC<Props> = ({ libraries, tags, activeView, onClose, onSave }) => {
     const [localLibs, setLocalLibs] = useState<Library[]>([...libraries])
     const [localTags, setLocalTags] = useState<string[]>([...tags])
     const [newLibName, setNewLibName] = useState('')
@@ -77,78 +78,82 @@ export const SettingsModal: React.FC<Props> = ({ libraries, tags, onClose, onSav
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content settings-modal" onClick={e => e.stopPropagation()}>
                 <header className="modal-header">
-                    <h2>Configuración</h2>
+                    <h2>{activeView === 'libraries' ? 'Configurar Bibliotecas' : 'Configurar Etiquetas'}</h2>
                     <button className="close-btn" onClick={onClose}><X size={24} /></button>
                 </header>
 
                 <div className="modal-body">
-                    <div className="settings-section">
-                        <h3>Bibliotecas</h3>
-                        <div className="library-list">
-                            {localLibs.map(lib => (
-                                <div key={lib.id} className="library-item">
-                                    {editingId === lib.id ? (
-                                        <div style={{ display: 'flex', gap: 10, flex: 1 }}>
-                                            <input
-                                                className="edit-input"
-                                                value={editName}
-                                                onChange={e => setEditName(e.target.value)}
-                                            />
-                                            <button className="icon-btn success" onClick={saveEdit}><Check size={18} /></button>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <span>{lib.name} {lib.id === 'default' && <small>(Principal)</small>}</span>
-                                            <div className="item-actions">
-                                                <button className="icon-btn" onClick={() => startEdit(lib)}><Edit2 size={16} /></button>
-                                                {lib.id !== 'default' && (
-                                                    <button className="icon-btn danger" onClick={() => handleDeleteLib(lib.id)}><Trash2 size={16} /></button>
-                                                )}
+                    {activeView === 'libraries' && (
+                        <div className="settings-section">
+                            <h3>Bibliotecas</h3>
+                            <div className="library-list">
+                                {localLibs.map(lib => (
+                                    <div key={lib.id} className="library-item">
+                                        {editingId === lib.id ? (
+                                            <div style={{ display: 'flex', gap: 10, flex: 1 }}>
+                                                <input
+                                                    className="edit-input"
+                                                    value={editName}
+                                                    onChange={e => setEditName(e.target.value)}
+                                                />
+                                                <button className="icon-btn success" onClick={saveEdit}><Check size={18} /></button>
                                             </div>
-                                        </>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
+                                        ) : (
+                                            <>
+                                                <span>{lib.name} {lib.id === 'default' && <small>(Principal)</small>}</span>
+                                                <div className="item-actions">
+                                                    <button className="icon-btn" onClick={() => startEdit(lib)}><Edit2 size={16} /></button>
+                                                    {lib.id !== 'default' && (
+                                                        <button className="icon-btn danger" onClick={() => handleDeleteLib(lib.id)}><Trash2 size={16} /></button>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
 
-                        <div className="add-item">
-                            <input
-                                placeholder="Nueva biblioteca..."
-                                value={newLibName}
-                                onChange={e => setNewLibName(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && handleAddLib()}
-                            />
-                            <button className="add-btn" onClick={handleAddLib}>
-                                <Plus size={18} /> Agregar
-                            </button>
+                            <div className="add-item">
+                                <input
+                                    placeholder="Nueva biblioteca..."
+                                    value={newLibName}
+                                    onChange={e => setNewLibName(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleAddLib()}
+                                />
+                                <button className="add-btn" onClick={handleAddLib}>
+                                    <Plus size={18} /> Agregar
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
-                    <div className="settings-section">
-                        <h3>Etiquetas Globales</h3>
-                        <div className="tags-manager-list" style={{ marginBottom: '15px' }}>
-                            {localTags.map(tag => (
-                                <div key={tag} className="tag-manager-item">
-                                    <span className="tag-badge-ui">{tag}</span>
-                                    <button className="icon-btn danger" onClick={() => handleDeleteTag(tag)}>
-                                        <Trash2 size={14} />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
+                    {activeView === 'tags' && (
+                        <div className="settings-section">
+                            <h3>Etiquetas Globales</h3>
+                            <div className="tags-manager-list" style={{ marginBottom: '15px' }}>
+                                {localTags.map(tag => (
+                                    <div key={tag} className="tag-manager-item">
+                                        <span className="tag-badge-ui">{tag}</span>
+                                        <button className="icon-btn danger" onClick={() => handleDeleteTag(tag)}>
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
 
-                        <div className="add-item">
-                            <input
-                                placeholder="Nueva etiqueta (ej: Favoritos)..."
-                                value={newTagName}
-                                onChange={e => setNewTagName(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && handleAddTag()}
-                            />
-                            <button className="add-btn" onClick={handleAddTag}>
-                                <Plus size={18} /> Agregar
-                            </button>
+                            <div className="add-item">
+                                <input
+                                    placeholder="Nueva etiqueta (ej: Favoritos)..."
+                                    value={newTagName}
+                                    onChange={e => setNewTagName(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleAddTag()}
+                                />
+                                <button className="add-btn" onClick={handleAddTag}>
+                                    <Plus size={18} /> Agregar
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 <footer className="modal-footer">

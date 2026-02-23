@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { BookListItem } from './components/BookListItem'
 import { SearchBar } from './components/SearchBar'
-import { LayoutGrid, Settings, User, HandHelping, X, Download, Gift, Trash2, RefreshCw } from 'lucide-react'
+import { LayoutGrid, Settings, User, HandHelping, X, Download, Gift, Trash2, RefreshCw, Tag, LogOut } from 'lucide-react'
 import { SettingsModal } from './components/SettingsModal'
 import { dataService } from './services/dataService'
 import { Book, Config, Library } from './types'
@@ -22,7 +22,7 @@ function App() {
     const [isSuperAdmin, setIsSuperAdmin] = useState(localStorage.getItem('biblion_role') === 'admin')
     const [filteredBooks, setFilteredBooks] = useState<Book[]>([])
     const [menuOpen, setMenuOpen] = useState(false)
-    const [settingsOpen, setSettingsOpen] = useState(false)
+    const [settingsView, setSettingsView] = useState<'libraries' | 'tags' | null>(null)
     const [loansOpen, setLoansOpen] = useState(false)
     const [wishlistOpen, setWishlistOpen] = useState(false)
     const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -207,7 +207,7 @@ function App() {
         }
         await dataService.saveConfig(currentUser, newConfig)
         setConfig(newConfig)
-        setSettingsOpen(false)
+        setSettingsView(null)
     }
 
     const handleExport = () => {
@@ -617,17 +617,29 @@ function App() {
 
                             {menuOpen && (
                                 <div className="settings-menu">
-                                    <div className="menu-item" onClick={() => { setMenuOpen(false); setSettingsOpen(true); }}>
-                                        <Settings size={18} />
-                                        <span>Configuración</span>
+                                    <div className="menu-item" onClick={() => { setMenuOpen(false); setSettingsView('libraries'); }}>
+                                        <LayoutGrid size={18} />
+                                        <span>Bibliotecas</span>
                                     </div>
-                                    <div className="menu-item" onClick={handleExport}>
+                                    <div className="menu-item" onClick={() => { setMenuOpen(false); setSettingsView('tags'); }}>
+                                        <Tag size={18} />
+                                        <span>Etiquetas</span>
+                                    </div>
+                                    <div className="menu-item" onClick={() => { setMenuOpen(false); handleExport(); }}>
                                         <Download size={18} />
                                         <span>Exportar Backup</span>
                                     </div>
-                                    <div className="menu-item" onClick={triggerImport}>
+                                    <div className="menu-item" onClick={() => { setMenuOpen(false); triggerImport(); }}>
                                         <Download size={18} style={{ transform: 'rotate(180deg)' }} />
                                         <span>Importar Backup</span>
+                                    </div>
+                                    <div
+                                        className="menu-item danger"
+                                        onClick={() => { setMenuOpen(false); handleLogout(); }}
+                                        style={{ borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: '5px', color: '#f38ba8' }}
+                                    >
+                                        <LogOut size={18} />
+                                        <span>Cerrar Sesión</span>
                                     </div>
                                 </div>
                             )}
@@ -1053,11 +1065,12 @@ function App() {
             }
 
             {
-                settingsOpen && config && (
+                settingsView && config && (
                     <SettingsModal
                         libraries={config.libraries}
                         tags={config.tags}
-                        onClose={() => setSettingsOpen(false)}
+                        activeView={settingsView}
+                        onClose={() => setSettingsView(null)}
                         onSave={handleSaveLibraries}
                     />
                 )

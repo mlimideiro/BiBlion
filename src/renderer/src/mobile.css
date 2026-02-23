@@ -1204,3 +1204,138 @@ body {
     cursor: pointer !important;
     outline: none !important;
 }
+
+/* Bottom Sheet */
+.bottom-sheet-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: flex;
+    align-items: flex-end;
+}
+
+.bottom-sheet {
+    width: 100%;
+    background: #1e1e2e;
+    border-radius: 24px 24px 0 0;
+    padding: 20px;
+    padding-bottom: env(safe-area-inset-bottom, 30px);
+    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+.bottom-sheet-handle {
+    width: 40px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+}
+
+.bottom-sheet-header {
+    margin-bottom: 25px;
+}
+
+.user-info-large {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-avatar-placeholder {
+    width: 60px;
+    height: 60px;
+    background: var(--card-bg);
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--mobile-accent);
+    border: 1px solid var(--card-border);
+}
+
+.user-details h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: #fff;
+}
+
+.user-details p {
+    margin: 2px 0 0;
+    color: var(--mobile-text-secondary);
+    font-size: 0.9rem;
+}
+
+.bottom-sheet-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.bottom-sheet-btn {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 16px;
+    font-size: 1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.bottom-sheet-btn:active {
+    transform: scale(0.98);
+}
+
+.bottom-sheet-btn.danger {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.bottom-sheet-btn.secondary {
+    background: var(--card-bg);
+    color: #fff;
+}
+
+.mobile-account-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #cdd6f4;
+    margin-top: 8px;
+    margin-bottom: -5px;
+    cursor: pointer;
+    padding: 10px;
+    transition: opacity 0.2s;
+}
+
+.mobile-account-trigger:active {
+    opacity: 0.6;
+}
+
+.mobile-account-trigger span {
+    font-size: 1.2rem;
+    font-weight: bold;
+    line-height: 1;
+}
