@@ -141,6 +141,20 @@ export class DataManager {
         }
     }
 
+    private formatTitleCase(title: string | undefined): string {
+        if (!title) return ''
+        const lowerExceptions = ['y', 'e', 'ni', 'o', 'u', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'a', 'ante', 'bajo', 'cabe', 'con', 'contra', 'de', 'desde', 'en', 'entre', 'hacia', 'hasta', 'para', 'por', 'según', 'sin', 'so', 'sobre', 'tras', 'del', 'al']
+        
+        return title.split(' ').map((word, index) => {
+            if (word.length === 0) return word
+            const lowerWord = word.toLowerCase()
+            if (index > 0 && lowerExceptions.includes(lowerWord)) {
+                return lowerWord
+            }
+            return word.charAt(0).toUpperCase() + lowerWord.slice(1)
+        }).join(' ')
+    }
+
     public saveBook(username: string, book: Book) {
         const { books: booksFile } = this.getUserPaths(username)
         const books = this.getAllBooks(username)
@@ -159,6 +173,7 @@ export class DataManager {
             books[index] = {
                 ...existingBook,
                 ...book,
+                title: this.formatTitleCase(book.title),
                 libraryId: book.libraryId !== undefined ? book.libraryId : existingBook.libraryId,
                 tags: book.tags !== undefined ? book.tags : existingBook.tags,
                 createdAt: existingBook.createdAt,
@@ -167,7 +182,7 @@ export class DataManager {
             }
         } else {
             // New
-            const newBook = { ...book }
+            const newBook = { ...book, title: this.formatTitleCase(book.title) }
             newBook.isbn = normalizedIsbn
             newBook.createdAt = new Date().toISOString()
             newBook.updatedAt = newBook.createdAt
@@ -213,6 +228,7 @@ export class DataManager {
                 books[index] = {
                     ...existing,
                     ...book,
+                    title: this.formatTitleCase(book.title),
                     libraryId: book.libraryId !== undefined ? book.libraryId : existing.libraryId,
                     tags: book.tags !== undefined ? book.tags : existing.tags,
                     createdAt: existing.createdAt, // Preserve
@@ -220,7 +236,7 @@ export class DataManager {
                 }
                 changed = true
             } else {
-                const newBook = { ...book }
+                const newBook = { ...book, title: this.formatTitleCase(book.title) }
                 newBook.isbn = normalizedIsbn
                 newBook.createdAt = new Date().toISOString()
                 newBook.updatedAt = newBook.createdAt
@@ -262,15 +278,26 @@ export class DataManager {
         this.createBackup(currentBooks, username)
 
         // Normalize and reset libraryId to ensure they are visible (unassigned)
-        const preparedBooks = importedBooks.map(book => ({
-            ...book,
-            isbn: this.normalizeIsbn(book.isbn),
-            // Reset libraryId so they appear in "Unassigned"
-            libraryId: "",
-            // Ensure dates exist
-            createdAt: book.createdAt || new Date().toISOString(),
-            updatedAt: book.updatedAt || new Date().toISOString()
-        }))
+        const preparedBooks = importedBooks.map(book => {
+            let newCoverPath = book.coverPath
+            if (newCoverPath && newCoverPath.startsWith('local:')) {
+                const parts = newCoverPath.split(':')
+                if (parts.length === 3) {
+                    newCoverPath = `local:${username}:${parts[2]}`
+                }
+            }
+
+            return {
+                ...book,
+                isbn: this.normalizeIsbn(book.isbn),
+                coverPath: newCoverPath,
+                // Reset libraryId so they appear in "Unassigned"
+                libraryId: "",
+                // Ensure dates exist
+                createdAt: book.createdAt || new Date().toISOString(),
+                updatedAt: book.updatedAt || new Date().toISOString()
+            }
+        })
 
         if (mode === 'replace') {
             fs.writeJsonSync(booksFile, preparedBooks, { spaces: 2 })

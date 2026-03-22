@@ -222,7 +222,11 @@ export const LibraryView: React.FC<Props> = ({
             </div>
 
             {selectedBook && (
-                <div className="modal-overlay" onClick={() => { setSelectedBook(null); setIsEditingBook(false); }}>
+                <div className="modal-overlay" onClick={() => { 
+                    if (isEditingBook) return;
+                    setSelectedBook(null); 
+                    setIsEditingBook(false); 
+                }}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
                         <div className="modal-actions-header">
                             <button className="close-btn" onClick={() => { setSelectedBook(null); setIsEditingBook(false); }}>

@@ -52,9 +52,28 @@ app.whenReady().then(() => {
         const coversDir = path.join(process.cwd(), 'db_biblion', 'users', username, 'covers')
         const localFilename = `${cleanIsbn}.jpg`
         const localPath = path.join(coversDir, localFilename)
-        if (fs.existsSync(localPath)) return
+        
+        if (fs.existsSync(localPath)) {
+            // Update the book path if it was left as HTTP even when cached
+            const books = dataManager.getAllBooks(username)
+            const idx = books.findIndex(b => b.isbn.replace(/[^a-zA-Z0-9]/g, '') === cleanIsbn)
+            if (idx >= 0 && books[idx].coverPath !== `local:${username}:${localFilename}`) {
+                books[idx].coverUrl = books[idx].coverUrl || books[idx].coverPath
+                books[idx].coverPath = `local:${username}:${localFilename}`
+                const userDir = path.join(process.cwd(), 'db_biblion', 'users', username)
+                const booksFile = path.join(userDir, 'books.json')
+                fsExtra.writeJsonSync(booksFile, books, { spaces: 2 })
+            }
+            return
+        }
 
-        axios.get(coverUrl, { responseType: 'arraybuffer', timeout: 15000 })
+        axios.get(coverUrl, { 
+            responseType: 'arraybuffer', 
+            timeout: 15000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        })
             .then(response => {
                 fsExtra.ensureDirSync(coversDir)
                 fs.writeFileSync(localPath, Buffer.from(response.data))

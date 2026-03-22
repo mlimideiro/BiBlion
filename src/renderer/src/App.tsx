@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { BookListItem } from './components/BookListItem'
 import { SearchBar } from './components/SearchBar'
-import { LayoutGrid, Settings, User, HandHelping, X, Download, Gift, Trash2, RefreshCw, Tag, LogOut } from 'lucide-react'
+import { LayoutGrid, Settings, User, HandHelping, X, Download, Gift, Trash2, RefreshCw, Tag, LogOut, BookPlus } from 'lucide-react'
 import { SettingsModal } from './components/SettingsModal'
 import { dataService } from './services/dataService'
 import { Book, Config, Library } from './types'
@@ -453,7 +453,7 @@ function App() {
             const updatedBooks = await dataService.saveBook(currentUser, updatedBook)
             setBooks(updatedBooks)
             setSelectedBook(updatedBook)
-            setIsEditingBook(false)
+            // Removed setIsEditingBook(false) to keep the modal open when navigating fields
         } catch (e) {
             alert("Error al guardar los cambios")
         }
@@ -624,6 +624,20 @@ function App() {
                                     <div className="menu-item" onClick={() => { setMenuOpen(false); setSettingsView('tags'); }}>
                                         <Tag size={18} />
                                         <span>Etiquetas</span>
+                                    </div>
+                                    <div className="menu-item" onClick={() => { 
+                                        setMenuOpen(false); 
+                                        setSelectedBook({
+                                            isbn: `manual_${Date.now()}`,
+                                            title: "",
+                                            authors: [],
+                                            createdAt: new Date().toISOString(),
+                                            updatedAt: new Date().toISOString()
+                                        } as Book);
+                                        setIsEditingBook(true);
+                                    }}>
+                                        <BookPlus size={18} />
+                                        <span>Agregar Libro</span>
                                     </div>
                                     <div className="menu-item" onClick={() => { setMenuOpen(false); handleExport(); }}>
                                         <Download size={18} />
@@ -808,7 +822,12 @@ function App() {
             )}
             {
                 selectedBook && (
-                    <div className="modal-overlay" onClick={() => { setSelectedBook(null); setIsEditingBook(false); setShowScraperPanel(false); }}>
+                    <div className="modal-overlay" onClick={() => { 
+                        if (isEditingBook) return;
+                        setSelectedBook(null); 
+                        setIsEditingBook(false); 
+                        setShowScraperPanel(false); 
+                    }}>
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
                             <div className="modal-actions-header">
                                 <div className="book-options-container" ref={bookMenuRef}>
