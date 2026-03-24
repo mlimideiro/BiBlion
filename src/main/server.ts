@@ -101,6 +101,30 @@ export function startServer(
         }
     })
 
+    app.post('/api/covers/rename', (req, res) => {
+        const { username, oldIsbn, newIsbn } = req.body
+        if (!username || !oldIsbn || !newIsbn) {
+            return res.status(400).json({ error: 'Missing parameters' })
+        }
+        try {
+            const cleanOld = oldIsbn.replace(/[^a-zA-Z0-9]/g, '')
+            const cleanNew = newIsbn.replace(/[^a-zA-Z0-9]/g, '')
+            const oldPath = path.join(process.cwd(), 'db_biblion', 'users', username, 'covers', `${cleanOld}.jpg`)
+            const newPath = path.join(process.cwd(), 'db_biblion', 'users', username, 'covers', `${cleanNew}.jpg`)
+            
+            if (fs.existsSync(oldPath)) {
+                fsExtra.ensureDirSync(path.dirname(newPath))
+                fs.renameSync(oldPath, newPath)
+                res.json({ success: true, renamed: true })
+            } else {
+                res.json({ success: true, renamed: false })
+            }
+        } catch (error) {
+            console.error(`[Server] Error renaming cover for ${username}:`, error)
+            res.status(500).json({ error: (error as Error).message })
+        }
+    })
+
     app.get('/api/lookup/:isbn', async (req, res) => {
         const { isbn } = req.params
         const { title, author } = req.query

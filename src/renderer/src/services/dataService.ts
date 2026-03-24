@@ -67,6 +67,16 @@ export const dataService = {
         }
     },
 
+    async renameCoverImage(username: string, oldIsbn: string, newIsbn: string): Promise<boolean> {
+        try {
+            const res = await axios.post(`${API_BASE}/covers/rename`, { username, oldIsbn, newIsbn })
+            return res.data?.success || false
+        } catch (e) {
+            console.error('Rename cover error:', e)
+            return false
+        }
+    },
+
     getCoverUrl(book: Book) {
         if (!book.coverPath) return ''
         if (book.coverPath.startsWith('http')) return book.coverPath

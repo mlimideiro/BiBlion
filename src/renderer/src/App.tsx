@@ -447,6 +447,16 @@ function App() {
             // If ISBN is changing, we must delete the old record first 
             // because the backend uses ISBN as the unique key.
             if (updatedData.isbn && updatedData.isbn !== selectedBook.isbn) {
+                if (selectedBook.coverPath && selectedBook.coverPath.startsWith(`local:${currentUser}:`)) {
+                    const success = await dataService.renameCoverImage(currentUser, selectedBook.isbn, updatedData.isbn)
+                    if (success) {
+                        const cleanNewIsbn = updatedData.isbn.replace(/[^a-zA-Z0-9]/g, '')
+                        updatedBook.coverPath = `local:${currentUser}:${cleanNewIsbn}.jpg`
+                    } else {
+                        console.warn("No se pudo renombrar la portada en el disco, se conserva el nombre viejo.")
+                        // If it fails, keep the old coverPath so it doesn't break the image display.
+                    }
+                }
                 await dataService.deleteBook(currentUser, selectedBook.isbn)
             }
 
@@ -864,12 +874,14 @@ function App() {
                                     {isEditingBook ? (
                                         <div className="edit-mode-container">
                                             <input
+                                                key={`title-${selectedBook.title}`}
                                                 className="edit-input"
                                                 defaultValue={selectedBook.title}
                                                 onBlur={(e) => handleEditSave({ title: e.target.value })}
                                                 placeholder="Título del libro"
                                             />
                                             <input
+                                                key={`authors-${selectedBook.authors.join(',')}`}
                                                 className="edit-input"
                                                 defaultValue={selectedBook.authors.join(', ')}
                                                 onBlur={(e) => handleEditSave({ authors: e.target.value.split(',').map(a => a.trim()).filter(a => a) })}
@@ -877,6 +889,7 @@ function App() {
                                             />
                                             <div className="modal-meta">
                                                 <input
+                                                    key={`isbn-${selectedBook.isbn}`}
                                                     className="edit-input"
                                                     defaultValue={selectedBook.isbn}
                                                     onBlur={(e) => handleEditSave({ isbn: e.target.value })}
@@ -884,12 +897,14 @@ function App() {
                                                 />
                                                 <div style={{ display: 'flex', gap: '10px' }}>
                                                     <input
+                                                        key={`publisher-${selectedBook.publisher || ''}`}
                                                         className="edit-input"
                                                         defaultValue={selectedBook.publisher || ''}
                                                         onBlur={(e) => handleEditSave({ publisher: e.target.value })}
                                                         placeholder="Editorial"
                                                     />
                                                     <input
+                                                        key={`pages-${selectedBook.pageCount || ''}`}
                                                         className="edit-input"
                                                         type="number"
                                                         defaultValue={selectedBook.pageCount || ''}
@@ -898,6 +913,7 @@ function App() {
                                                     />
                                                 </div>
                                                 <input
+                                                    key={`cover-${selectedBook.coverPath || ''}`}
                                                     className="edit-input"
                                                     defaultValue={selectedBook.coverPath || ''}
                                                     onBlur={(e) => handleEditSave({ coverPath: e.target.value })}
@@ -905,6 +921,7 @@ function App() {
                                                 />
                                             </div>
                                             <textarea
+                                                key={`desc-${selectedBook.description || ''}`}
                                                 className="edit-textarea"
                                                 defaultValue={selectedBook.description || ''}
                                                 onBlur={(e) => handleEditSave({ description: e.target.value })}
