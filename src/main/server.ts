@@ -8,6 +8,7 @@ import axios from 'axios'
 import { DataManager, Book } from './dataManager'
 import { MetadataService } from './metadataService'
 import { ScraperService } from './scraperService'
+import { AdminUtils } from './adminUtils'
 
 export function startServer(
     dataManager: DataManager,
@@ -22,6 +23,7 @@ export function startServer(
     app.use(cors())
 
     const USERS_FILE = path.join(process.cwd(), 'db_biblion', 'users.json')
+    const adminUtils = new AdminUtils(dataManager)
 
     app.post('/api/login', (req, res) => {
         const { username, password } = req.body
@@ -122,6 +124,23 @@ export function startServer(
         } catch (error) {
             console.error(`[Server] Error renaming cover for ${username}:`, error)
             res.status(500).json({ error: (error as Error).message })
+        }
+    })
+
+    app.post('/api/admin/sync-covers', async (_req, res) => {
+        console.log('[Admin] Request for sync-covers...')
+        res.setHeader('Content-Type', 'text/plain')
+        res.setHeader('Transfer-Encoding', 'chunked')
+
+        try {
+            await adminUtils.syncAllUserCovers((msg) => {
+                res.write(msg + '\n')
+            })
+            res.end()
+        } catch (error: any) {
+            console.error('[Admin] Global error during sync:', error)
+            res.write('\n[FATAL ERROR] ' + error.message)
+            res.end()
         }
     })
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { User, UserPlus, LogOut, Shield, Edit2, Trash2, X, Save } from 'lucide-react'
+import { User, UserPlus, LogOut, Shield, Edit2, Trash2, Save, Settings, RefreshCw, Terminal } from 'lucide-react'
+import { dataService } from '../services/dataService'
 
 interface AdminDashboardProps {
     onLogout: () => void
@@ -11,6 +12,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     const [newUserPass, setNewUserPass] = useState('')
     const [msg, setMsg] = useState('')
     const [error, setError] = useState('')
+    const [activeTab, setActiveTab] = useState<'users' | 'utils'>('users')
+    const [syncLogs, setSyncLogs] = useState<string[]>([])
+    const [isSyncing, setIsSyncing] = useState(false)
 
     useEffect(() => {
         loadUsers()
@@ -22,7 +26,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 const usersList = await (window as any).electron.getUsers()
                 setUsers(usersList)
             } else {
-                // Fetch from API
                 const response = await fetch(`${window.location.origin}/api/users`)
                 const usersList = await response.json()
                 setUsers(usersList)
@@ -36,9 +39,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         e.preventDefault()
         setMsg('')
         setError('')
-
         if (!newUserUser || !newUserPass) return
-
         try {
             let result: any
             if ((window as any).electron) {
@@ -47,7 +48,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     password: newUserPass
                 })
             } else {
-                // Call API
                 const response = await fetch(`${window.location.origin}/api/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -55,7 +55,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 })
                 result = await response.json()
             }
-
             if (result.success) {
                 setMsg(`Usuario "${newUserUser}" creado correctamente.`)
                 setNewUserUser('')
@@ -83,7 +82,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 })
                 result = await response.json()
             }
-
             if (result.success) {
                 loadUsers()
             } else {
@@ -112,7 +110,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 })
                 result = await response.json()
             }
-
             if (result.success) {
                 setEditingUser(null)
                 setEditPassword('')
@@ -125,6 +122,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         }
     }
 
+    const handleStartSync = async () => {
+        setSyncLogs(['Iniciando proceso...'])
+        setIsSyncing(true)
+        try {
+            await dataService.syncCovers((chunk) => {
+                setSyncLogs(prev => {
+                    const lines = chunk.split('\n').filter(l => l.trim())
+                    return [...prev, ...lines]
+                })
+            })
+        } catch (e: any) {
+            setSyncLogs(prev => [...prev, `[ERROR FATAL] ${e.message}`])
+        } finally {
+            setIsSyncing(false)
+        }
+    }
+
     return (
         <div className="admin-container">
             <div className="admin-sidebar">
@@ -132,113 +146,181 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     <Shield size={40} className="admin-icon-logo" />
                     <h2>SuperAdmin</h2>
                 </div>
+                
+                <nav className="admin-nav">
+                    <button 
+                        className={`nav-item ${activeTab === 'users' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('users')}
+                    >
+                        <User size={18} /> Usuarios
+                    </button>
+                    <button 
+                        className={`nav-item ${activeTab === 'utils' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('utils')}
+                    >
+                        <Settings size={18} /> Utilidades
+                    </button>
+                </nav>
+
                 <button className="logout-btn" onClick={onLogout}>
                     <LogOut size={18} /> Cerrar Sesión
                 </button>
             </div>
 
             <div className="admin-content">
-                <header>
-                    <h1>Gestión de Usuarios</h1>
-                    <p>Crea cuentas para que cada usuario tenga su propia biblioteca aislada.</p>
-                </header>
+                {activeTab === 'users' ? (
+                    <>
+                        <header>
+                            <h1>Gestión de Usuarios</h1>
+                            <p>Crea cuentas para que cada usuario tenga su propia biblioteca aislada.</p>
+                        </header>
 
-                <div className="admin-grid">
-                    <div className="admin-card create-user-card">
-                        <h3><UserPlus size={20} /> Crear Nuevo Usuario</h3>
-                        <form onSubmit={handleCreateUser}>
-                            <div className="form-group">
-                                <label>Usuario</label>
-                                <input
-                                    type="text"
-                                    value={newUserUser}
-                                    onChange={e => setNewUserUser(e.target.value)}
-                                    placeholder="Nombre de usuario"
-                                    className="admin-input"
-                                />
+                        <div className="admin-grid">
+                            <div className="admin-card create-user-card">
+                                <h3><UserPlus size={20} /> Crear Nuevo Usuario</h3>
+                                <form onSubmit={handleCreateUser}>
+                                    <div className="form-group">
+                                        <label>Usuario</label>
+                                        <input
+                                            type="text"
+                                            value={newUserUser}
+                                            onChange={e => setNewUserUser(e.target.value)}
+                                            placeholder="Nombre de usuario"
+                                            className="admin-input"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Contraseña</label>
+                                        <input
+                                            type="text"
+                                            value={newUserPass}
+                                            onChange={e => setNewUserPass(e.target.value)}
+                                            placeholder="Contraseña"
+                                            className="admin-input"
+                                        />
+                                    </div>
+                                    {msg && <div className="success-msg">{msg}</div>}
+                                    {error && <div className="error-msg">{error}</div>}
+                                    <button className="create-btn" type="submit">Dar de Alta</button>
+                                </form>
                             </div>
-                            <div className="form-group">
-                                <label>Contraseña</label>
-                                <input
-                                    type="text"
-                                    value={newUserPass}
-                                    onChange={e => setNewUserPass(e.target.value)}
-                                    placeholder="Contraseña"
-                                    className="admin-input"
-                                />
-                            </div>
-                            {msg && <div className="success-msg">{msg}</div>}
-                            {error && <div className="error-msg">{error}</div>}
-                            <button className="create-btn" type="submit">Dar de Alta</button>
-                        </form>
-                    </div>
 
-                    <div className="admin-card users-list-card">
-                        <h3><User size={20} /> Usuarios Activos ({users.length})</h3>
-                        <div className="users-list">
-                            {users.map((user, i) => (
-                                <div key={user.username} className="user-card-item">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <div className="user-avatar-small">
-                                            <User size={16} />
+                            <div className="admin-card users-list-card">
+                                <h3><User size={20} /> Usuarios Activos ({users.length})</h3>
+                                <div className="users-list">
+                                    {users.map((user) => (
+                                        <div key={user.username} className="user-card-item">
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <div className="user-avatar-small">
+                                                    <User size={16} />
+                                                </div>
+                                                <span>{user.username}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button
+                                                    className="icon-btn"
+                                                    title="Cambiar contraseña"
+                                                    onClick={() => { setEditingUser(user.username); setEditPassword(''); }}
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
+                                                <button
+                                                    className="icon-btn danger"
+                                                    title="Eliminar usuario"
+                                                    onClick={() => handleDeleteUser(user.username)}
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </div>
-                                        <span>{user.username}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                        <button
-                                            className="icon-btn"
-                                            title="Cambiar contraseña"
-                                            onClick={() => { setEditingUser(user.username); setEditPassword(''); }}
-                                        >
-                                            <Edit2 size={16} />
-                                        </button>
-                                        <button
-                                            className="icon-btn danger"
-                                            title="Eliminar usuario"
-                                            onClick={() => handleDeleteUser(user.username)}
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
+                                    ))}
                                 </div>
-                            ))}
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <header>
+                            <h1>Utilidades de Sistema</h1>
+                            <p>Herramientas avanzadas para mantenimiento y reparación de datos.</p>
+                        </header>
+                        
+                        <div className="admin-grid" style={{ gridTemplateColumns: '1fr' }}>
+                            <div className="admin-card sync-card">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                    <div>
+                                        <h3><RefreshCw size={20} className={isSyncing ? 'spin-anim' : ''} /> Sincronización Tapas</h3>
+                                        <p style={{ fontSize: '0.9rem', color: '#888', maxWidth: '600px', margin: '10px 0 0' }}>
+                                            Este script recorre todos los usuarios del sistema para normalizar sus portadas:
+                                            <ul style={{ paddingLeft: '20px', marginTop: '10px' }}>
+                                                <li>Descarga imágenes desde enlaces externos (HTTP).</li>
+                                                <li>Renombra archivos con nombres temporales (manual/wish) al ISBN final.</li>
+                                                <li>Corrige enlaces rotos por desincronización de ISBN.</li>
+                                            </ul>
+                                        </p>
+                                    </div>
+                                    <button 
+                                        className="create-btn" 
+                                        style={{ width: 'auto', padding: '12px 30px' }}
+                                        onClick={handleStartSync}
+                                        disabled={isSyncing}
+                                    >
+                                        {isSyncing ? 'Sincronizando...' : 'Comenzar Sincronización'}
+                                    </button>
+                                </div>
+
+                                {syncLogs.length > 0 && (
+                                    <div className="log-console">
+                                        <div className="log-header">
+                                            <Terminal size={14} /> Consola de Salida
+                                        </div>
+                                        <div className="log-content">
+                                            {syncLogs.map((log, i) => (
+                                                <div key={i} className="log-line">{log}</div>
+                                            ))}
+                                            {isSyncing && <div className="log-cursor">_</div>}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {editingUser && (
+                <div className="modal-overlay" onClick={() => setEditingUser(null)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px', background: '#1e1e26', border: '1px solid rgba(255,255,255,0.1)', padding: '30px' }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#fff' }}>Cambiar contraseña para <span style={{ color: '#a78bfa' }}>{editingUser}</span></h3>
+
+                        <div className="form-group">
+                            <label style={{ display: 'block', color: '#ccc', marginBottom: '8px', fontSize: '0.9rem' }}>Nueva Contraseña</label>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type="text"
+                                    className="admin-input"
+                                    value={editPassword}
+                                    onChange={(e) => setEditPassword(e.target.value)}
+                                    placeholder="Ingresa la nueva clave"
+                                    autoFocus
+                                    style={{ width: '100%', padding: '12px', fontSize: '1rem' }}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="modal-footer" style={{ marginTop: '25px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                            <button className="action-btn secondary" onClick={() => setEditingUser(null)} style={{ padding: '10px 15px', background: 'transparent', border: '1px solid #444', color: '#ccc' }}>
+                                Cancelar
+                            </button>
+                            <button className="action-btn" onClick={handleUpdateUser} style={{ padding: '10px 20px', background: '#a78bfa', color: '#000', fontWeight: 'bold' }}>
+                                <Save size={18} />
+                                <span>Guardar</span>
+                            </button>
                         </div>
                     </div>
                 </div>
+            )}
 
-                {editingUser && (
-                    <div className="modal-overlay" onClick={() => setEditingUser(null)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px', background: '#1e1e26', border: '1px solid rgba(255,255,255,0.1)', padding: '30px' }}>
-                            <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#fff' }}>Cambiar contraseña para <span style={{ color: '#a78bfa' }}>{editingUser}</span></h3>
-
-                            <div className="form-group">
-                                <label style={{ display: 'block', color: '#ccc', marginBottom: '8px', fontSize: '0.9rem' }}>Nueva Contraseña</label>
-                                <div style={{ position: 'relative' }}>
-                                    <input
-                                        type="text"
-                                        className="admin-input"
-                                        value={editPassword}
-                                        onChange={(e) => setEditPassword(e.target.value)}
-                                        placeholder="Ingresa la nueva clave"
-                                        autoFocus
-                                        style={{ width: '100%', padding: '12px', fontSize: '1rem' }}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="modal-footer" style={{ marginTop: '25px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                                <button className="action-btn secondary" onClick={() => setEditingUser(null)} style={{ padding: '10px 15px', background: 'transparent', border: '1px solid #444', color: '#ccc' }}>
-                                    Cancelar
-                                </button>
-                                <button className="action-btn" onClick={handleUpdateUser} style={{ padding: '10px 20px', background: '#a78bfa', color: '#000', fontWeight: 'bold' }}>
-                                    <Save size={18} />
-                                    <span>Guardar</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
             <style>{`
                 .admin-container {
                     display: flex;
@@ -358,24 +440,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     flex-direction: column;
                     gap: 10px;
                 }
-                .user-item {
+                .user-card-item {
                     display: flex;
                     align-items: center;
-                    gap: 15px;
+                    justify-content: space-between;
                     padding: 12px;
                     background: rgba(255,255,255,0.03);
                     border-radius: 10px;
                 }
-                .user-avatar {
-                    width: 36px;
-                    height: 36px;
+                .user-avatar-small {
+                    width: 32px;
+                    height: 32px;
                     background: #a78bfa;
                     color: black;
                     border-radius: 50%;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-weight: bold;
+                }
+                .icon-btn {
+                    background: rgba(255,255,255,0.05);
+                    border: none;
+                    color: #aaa;
+                    padding: 8px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s;
+                }
+                .icon-btn:hover {
+                    background: rgba(255,255,255,0.1);
+                    color: white;
+                }
+                .icon-btn.danger:hover {
+                    background: rgba(255, 50, 50, 0.2);
+                    color: #ff6b6b;
                 }
                 .success-msg {
                     color: #4ade80;
@@ -390,6 +491,101 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     padding: 10px;
                     background: rgba(248, 113, 113, 0.1);
                     border-radius: 6px;
+                }
+                .admin-nav {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                    margin-bottom: 30px;
+                }
+                .nav-item {
+                    background: transparent;
+                    border: none;
+                    color: #aaa;
+                    padding: 12px 15px;
+                    border-radius: 10px;
+                    text-align: left;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    font-size: 0.95rem;
+                    transition: all 0.2s;
+                }
+                .nav-item:hover {
+                    background: rgba(255,255,255,0.05);
+                    color: white;
+                }
+                .nav-item.active {
+                    background: rgba(167, 139, 250, 0.15);
+                    color: #a78bfa;
+                    font-weight: 600;
+                }
+                .log-console {
+                    background: #000;
+                    border-radius: 12px;
+                    border: 1px solid #333;
+                    margin-top: 20px;
+                    overflow: hidden;
+                }
+                .log-header {
+                    background: #111;
+                    padding: 8px 15px;
+                    font-size: 0.75rem;
+                    color: #666;
+                    border-bottom: 1px solid #222;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                }
+                .log-content {
+                    padding: 15px;
+                    height: 300px;
+                    overflow-y: auto;
+                    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+                    font-size: 0.85rem;
+                    color: #00ff00;
+                    background: #050505;
+                }
+                .log-line {
+                    margin-bottom: 4px;
+                    white-space: pre-wrap;
+                }
+                .log-cursor {
+                    display: inline-block;
+                    animation: blink 1s step-end infinite;
+                }
+                @keyframes blink {
+                    50% { opacity: 0; }
+                }
+                .spin-anim {
+                    animation: spin 2s linear infinite;
+                }
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                button:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+                .modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.8);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 1000;
+                }
+                .modal-content {
+                    border-radius: 20px;
+                    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
                 }
             `}</style>
         </div>

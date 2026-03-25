@@ -92,5 +92,19 @@ export const dataService = {
         // Fallback: legacy global covers
         const filename = book.coverPath.split(/[/\\]/).pop()
         return `${API_BASE}/covers/${filename}`
+    },
+
+    async syncCovers(onProgress: (msg: string) => void) {
+        const response = await fetch(`${API_BASE}/admin/sync-covers`, { method: 'POST' })
+        const reader = response.body?.getReader()
+        const decoder = new TextDecoder()
+        if (!reader) return
+
+        while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            const chunk = decoder.decode(value, { stream: true })
+            onProgress(chunk)
+        }
     }
 }
