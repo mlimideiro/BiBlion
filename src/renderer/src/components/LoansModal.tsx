@@ -80,7 +80,7 @@ export const LoansModal: React.FC<Props> = ({ books, onSaveBook, onClose }) => {
     }
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay">
             <div className="modal-content loans-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
                 <header className="modal-header" style={{ paddingBottom: '10px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>

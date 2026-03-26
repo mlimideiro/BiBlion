@@ -222,7 +222,7 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onPu
     }
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay">
             <style>
                 {`
                     @keyframes low-pulse {

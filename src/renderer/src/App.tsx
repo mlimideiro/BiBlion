@@ -717,7 +717,7 @@ function App() {
                     </div>
                 )}
 
-                <div className="book-list">
+                <div className={`book-list ${thumbnailSize === 'S' ? 'is-list-mode' : ''}`}>
                     {filteredBooks.map(book => (
                         <div
                             key={book.isbn}
@@ -726,6 +726,7 @@ function App() {
                         >
                             <BookListItem
                                 book={book}
+                                layoutMode={thumbnailSize === 'S' ? 'list' : 'grid'}
                                 isSelectionMode={isSelectionMode}
                                 isSelected={selectedIsbns.includes(book.isbn)}
                                 onToggleSelection={(e) => {

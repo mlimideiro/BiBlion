@@ -75,7 +75,7 @@ export const SettingsModal: React.FC<Props> = ({ libraries, tags, activeView, on
     }
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay">
             <div className="modal-content settings-modal" onClick={e => e.stopPropagation()}>
                 <header className="modal-header">
                     <h2>{activeView === 'libraries' ? 'Configurar Bibliotecas' : 'Configurar Etiquetas'}</h2>
