@@ -154,7 +154,7 @@ body {
 
 .book-item.mode-list {
     flex-direction: row !important;
-    height: 110px !important;
+    height: 125px !important;
     align-items: stretch;
 }
 
@@ -173,6 +173,7 @@ body {
 .book-item.mode-list .book-info h3 {
     font-size: 1.1rem;
     margin-bottom: 2px;
+    line-height: 1.3;
 }
 
 .book-item.mode-list .book-info p {
