@@ -132,12 +132,25 @@ export class DataManager {
             if (!fs.existsSync(booksFile)) {
                 return []
             }
-            return fs.readJsonSync(booksFile) as Book[]
+            const books = fs.readJsonSync(booksFile) as Book[]
+            return books.map(b => this.normalizeBook(b))
         } catch (error) {
             console.error(`[DataManager] CRITICAL: Error reading books.json for ${username}:`, error)
             // NEVER return [] on read error if the file exists, 
             // as it would lead callers to overwrite the DB with partial data.
             throw new Error(`Could not read database for user ${username}. Data integrity preserved.`)
+        }
+    }
+
+    private normalizeBook(book: any): Book {
+        return {
+            ...book,
+            isbn: book.isbn || `MISSING-${Date.now()}`,
+            title: book.title || 'Sin Título',
+            authors: Array.isArray(book.authors) ? book.authors : (book.author ? [book.author] : []),
+            tags: Array.isArray(book.tags) ? book.tags : [],
+            createdAt: book.createdAt || new Date().toISOString(),
+            updatedAt: book.updatedAt || new Date().toISOString()
         }
     }
 
@@ -158,8 +171,9 @@ export class DataManager {
     public saveBook(username: string, book: Book) {
         const { books: booksFile } = this.getUserPaths(username)
         const books = this.getAllBooks(username)
+        const normalizedInput = this.normalizeBook(book)
 
-        const normalizedIsbn = this.normalizeIsbn(book.isbn)
+        const normalizedIsbn = this.normalizeIsbn(normalizedInput.isbn)
         const index = books.findIndex(b => this.normalizeIsbn(b.isbn) === normalizedIsbn)
 
         console.log(`[DataManager] Saving book for ${username}: "${book.title}"`)
@@ -172,22 +186,22 @@ export class DataManager {
             const existingBook = books[index]
             books[index] = {
                 ...existingBook,
-                ...book,
-                title: this.formatTitleCase(book.title),
-                libraryId: book.libraryId !== undefined ? book.libraryId : existingBook.libraryId,
-                tags: book.tags !== undefined ? book.tags : existingBook.tags,
+                ...normalizedInput,
+                title: this.formatTitleCase(normalizedInput.title),
+                libraryId: normalizedInput.libraryId !== undefined ? normalizedInput.libraryId : existingBook.libraryId,
+                tags: normalizedInput.tags !== undefined ? normalizedInput.tags : existingBook.tags,
                 createdAt: existingBook.createdAt,
                 isbn: existingBook.isbn,
                 updatedAt: new Date().toISOString()
             }
         } else {
             // New
-            const newBook = { ...book, title: this.formatTitleCase(book.title) }
+            const newBook = { ...normalizedInput, title: this.formatTitleCase(normalizedInput.title) }
             newBook.isbn = normalizedIsbn
             newBook.createdAt = new Date().toISOString()
             newBook.updatedAt = newBook.createdAt
             // Preserve libraryId if provided (important for wishlist conversion)
-            newBook.libraryId = book.libraryId !== undefined ? book.libraryId : ""
+            newBook.libraryId = normalizedInput.libraryId !== undefined ? normalizedInput.libraryId : ""
             books.push(newBook)
         }
 
@@ -220,7 +234,8 @@ export class DataManager {
         this.createBackup(books, username)
 
         let changed = false
-        booksToSave.forEach(book => {
+        booksToSave.forEach(bookInput => {
+            const book = this.normalizeBook(bookInput)
             const normalizedIsbn = this.normalizeIsbn(book.isbn)
             const index = books.findIndex(b => this.normalizeIsbn(b.isbn) === normalizedIsbn)
             if (index >= 0) {
@@ -278,7 +293,8 @@ export class DataManager {
         this.createBackup(currentBooks, username)
 
         // Normalize and reset libraryId to ensure they are visible (unassigned)
-        const preparedBooks = importedBooks.map(book => {
+        const preparedBooks = importedBooks.map(bookInput => {
+            const book = this.normalizeBook(bookInput)
             let newCoverPath = book.coverPath
             if (newCoverPath && newCoverPath.startsWith('local:')) {
                 const parts = newCoverPath.split(':')
@@ -293,7 +309,7 @@ export class DataManager {
                 coverPath: newCoverPath,
                 // Reset libraryId so they appear in "Unassigned"
                 libraryId: "",
-                // Ensure dates exist
+                // Ensure dates exist (already handled by normalizeBook but being explicit)
                 createdAt: book.createdAt || new Date().toISOString(),
                 updatedAt: book.updatedAt || new Date().toISOString()
             }

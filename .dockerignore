@@ -3,10 +3,9 @@ dist
 .DS_Store
 *.local
 .env
-# Data
 db_biblion/
-!db_biblion/.keep
-
-# Logs
+docker-compose.override.yml
+.git
+.vscode
+.idea
 *.log
-rename_debug.log

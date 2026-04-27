@@ -35,13 +35,13 @@ export const BookListItem: React.FC<Props> = ({
                 ) : (
                     <div className="placeholder-cover">Sin Tapa</div>
                 )}
-                {(!book.coverPath && !book.coverUrl || book.authors.length === 0) && (
+                {(!book.coverPath && !book.coverUrl || !Array.isArray(book.authors) || book.authors.length === 0) && (
                     <div className="incomplete-badge">Incompleto</div>
                 )}
             </div>
             <div className="book-info">
                 <h3>{book.title}</h3>
-                <p>{book.authors.join(', ')}</p>
+                <p>{Array.isArray(book.authors) ? book.authors.join(', ') : ''}</p>
             </div>
         </div>
     )

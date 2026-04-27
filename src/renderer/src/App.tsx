@@ -139,17 +139,17 @@ function App() {
         if (searchQuery) {
             const normalizedQuery = normalizeText(searchQuery)
             result = result.filter(b => {
-                const title = normalizeText(b.title)
-                const authors = b.authors.map(a => normalizeText(a))
+                const title = normalizeText(b.title || '')
+                const authors = Array.isArray(b.authors) ? b.authors.map(a => normalizeText(a || '')) : []
                 return title.includes(normalizedQuery) ||
                     authors.some(a => a.includes(normalizedQuery)) ||
-                    b.isbn.includes(searchQuery)
+                    (b.isbn && b.isbn.includes(searchQuery))
             })
         }
 
         // 3. Filter by tag
         if (selectedTag) {
-            result = result.filter(b => b.tags?.includes(selectedTag))
+            result = result.filter(b => Array.isArray(b.tags) && b.tags.includes(selectedTag))
         }
 
         setFilteredBooks(result)
