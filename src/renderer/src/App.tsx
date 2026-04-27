@@ -370,7 +370,11 @@ function App() {
 
                 // If ISBN changed, delete the old record to avoid duplicates
                 if (finalIsbn !== selectedBook.isbn) {
-                    await dataService.deleteBook(currentUser || '', selectedBook.isbn)
+                    try {
+                        await dataService.deleteBook(currentUser || '', selectedBook.isbn)
+                    } catch (e) {
+                        console.warn("Could not delete old record (it may not have been saved yet):", e)
+                    }
                 }
 
                 const updatedBooks = await dataService.saveBook(currentUser || '', updatedBook)
@@ -457,7 +461,11 @@ function App() {
                         // If it fails, keep the old coverPath so it doesn't break the image display.
                     }
                 }
-                await dataService.deleteBook(currentUser, selectedBook.isbn)
+                try {
+                    await dataService.deleteBook(currentUser, selectedBook.isbn)
+                } catch (e) {
+                    console.warn("Could not delete old record (it may not have been saved yet):", e)
+                }
             }
 
             const updatedBooks = await dataService.saveBook(currentUser, updatedBook)
@@ -485,7 +493,11 @@ function App() {
 
                 // If ISBN changed (e.g. from WISH- placeholder to real), delete old one
                 if (finalIsbn !== selectedBook.isbn) {
-                    await dataService.deleteBook(currentUser, selectedBook.isbn)
+                    try {
+                        await dataService.deleteBook(currentUser, selectedBook.isbn)
+                    } catch (e) {
+                        console.warn("Could not delete old record (it may not have been saved yet):", e)
+                    }
                 }
 
                 const updatedBooks = await dataService.saveBook(currentUser, updatedBook)

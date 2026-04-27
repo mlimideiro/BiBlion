@@ -26,7 +26,7 @@ export class AdminUtils {
       let modified = false
 
       for (const book of books) {
-        const cleanIsbn = book.isbn.replace(/[^a-zA-Z0-9]/g, '')
+        const cleanIsbn = book.isbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
         const coversDir = path.join(USERS_ROOT, username, 'covers')
         const expectedFilename = `${cleanIsbn}.jpg`
         const expectedLocalPath = path.join(coversDir, expectedFilename)
@@ -64,7 +64,7 @@ export class AdminUtils {
             const isManualPattern = currentFilename.toUpperCase().includes('MANUAL') || currentFilename.toUpperCase().includes('WISH')
             const isMismatch = (currentFilename !== expectedFilename && !isManualPattern)
 
-            if (isManualPattern || isMismatch) {
+            if ((isManualPattern || isMismatch) && currentFilename !== expectedFilename) {
                 const currentLocalPath = path.join(coversDir, currentFilename)
                 if (fs.existsSync(currentLocalPath)) {
                     logCallback(`  [Renombrado] "${book.title}": de ${currentFilename} a ${expectedFilename}`)

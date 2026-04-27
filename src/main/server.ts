@@ -109,8 +109,8 @@ export function startServer(
             return res.status(400).json({ error: 'Missing parameters' })
         }
         try {
-            const cleanOld = oldIsbn.replace(/[^a-zA-Z0-9]/g, '')
-            const cleanNew = newIsbn.replace(/[^a-zA-Z0-9]/g, '')
+            const cleanOld = oldIsbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+            const cleanNew = newIsbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
             const oldPath = path.join(process.cwd(), 'db_biblion', 'users', username, 'covers', `${cleanOld}.jpg`)
             const newPath = path.join(process.cwd(), 'db_biblion', 'users', username, 'covers', `${cleanNew}.jpg`)
             
@@ -167,7 +167,7 @@ export function startServer(
     // Helper: download external cover to per-user local storage (fire & forget)
     const downloadCoverToLocal = (username: string, isbn: string, coverUrl: string) => {
         if (!coverUrl || !coverUrl.startsWith('http')) return
-        const cleanIsbn = isbn.replace(/[^a-zA-Z0-9]/g, '')
+        const cleanIsbn = isbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
         const coversDir = path.join(process.cwd(), 'db_biblion', 'users', username, 'covers')
         const localFilename = `${cleanIsbn}.jpg`
         const localPath = path.join(coversDir, localFilename)
@@ -306,13 +306,8 @@ export function startServer(
         console.log(`[Server] Delete request for ${username}: ISBN ${isbn}`)
         try {
             const success = dataManager.deleteBook(username as string, isbn)
-
-            if (success) {
-                const allBooks = dataManager.getAllBooks(username as string)
-                res.json(allBooks)
-            } else {
-                res.status(404).json({ error: 'Book not found' })
-            }
+            const allBooks = dataManager.getAllBooks(username as string)
+            res.json(allBooks)
         } catch (error) {
             console.error(`[Server] Error deleting book for ${username}:`, error)
             res.status(500).json({ error: (error as Error).message })
