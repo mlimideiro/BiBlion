@@ -47,9 +47,11 @@ function App() {
     const [importBooksCount, setImportBooksCount] = useState(0)
     const [importing, setImporting] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const coverInputRef = useRef<HTMLInputElement>(null)
     const menuRef = useRef<HTMLDivElement>(null)
     const bookMenuRef = useRef<HTMLDivElement>(null)
     const tagsRef = useRef<HTMLDivElement>(null)
+    const [isDragging, setIsDragging] = useState(false)
 
     const THUMB_SIZES = {
         S: { w: '100px', h: '145px' },
@@ -477,6 +479,41 @@ function App() {
         }
     }
 
+    const processAndUploadImage = async (file: File) => {
+        if (!selectedBook || !currentUser) return
+        if (!file.type.startsWith('image/')) {
+            alert('Por favor, selecciona un archivo de imagen válido.')
+            return
+        }
+
+        const reader = new FileReader()
+        reader.onload = (e) => {
+            const img = new Image()
+            img.onload = async () => {
+                const canvas = document.createElement('canvas')
+                const MAX_WIDTH = 400
+                const scale = Math.min(1, MAX_WIDTH / img.width)
+                canvas.width = img.width * scale
+                canvas.height = img.height * scale
+
+                const ctx = canvas.getContext('2d')
+                if (!ctx) return
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+                const base64 = canvas.toDataURL('image/jpeg', 0.7)
+                const newPath = await dataService.uploadCover(currentUser, selectedBook.isbn, base64)
+
+                if (newPath) {
+                    handleEditSave({ coverPath: newPath })
+                } else {
+                    alert('Error al subir la imagen al servidor.')
+                }
+            }
+            img.src = e.target?.result as string
+        }
+        reader.readAsDataURL(file)
+    }
+
     const handleScrape = async () => {
         if (!scraperUrl || !currentUser) return
         try {
@@ -876,12 +913,48 @@ function App() {
                                 <button className="close-btn" onClick={() => { setSelectedBook(null); setIsEditingBook(false); setShowScraperPanel(false); }}><X /></button>
                             </div>
                             <div className="modal-body">
-                                <div className="modal-cover">
+                                <div 
+                                    className={`modal-cover ${isEditingBook ? 'is-editing' : ''} ${isDragging ? 'dragging' : ''}`}
+                                    onDragOver={(e) => {
+                                        if (!isEditingBook) return
+                                        e.preventDefault()
+                                        setIsDragging(true)
+                                    }}
+                                    onDragLeave={() => setIsDragging(false)}
+                                    onDrop={(e) => {
+                                        if (!isEditingBook) return
+                                        e.preventDefault()
+                                        setIsDragging(false)
+                                        const file = e.dataTransfer.files[0]
+                                        if (file) processAndUploadImage(file)
+                                    }}
+                                    onClick={() => {
+                                        if (isEditingBook && coverInputRef.current) {
+                                            coverInputRef.current.click()
+                                        }
+                                    }}
+                                >
                                     {selectedBook.coverPath ? (
                                         <img src={dataService.getCoverUrl(selectedBook)} alt={selectedBook.title} />
                                     ) : (
                                         <div className="placeholder-cover">Sin Tapa</div>
                                     )}
+                                    {isEditingBook && (
+                                        <div className="cover-upload-overlay">
+                                            <span>📷 Cambiar Tapa</span>
+                                            <p>(O arrastra una imagen)</p>
+                                        </div>
+                                    )}
+                                    <input 
+                                        type="file" 
+                                        ref={coverInputRef} 
+                                        style={{ display: 'none' }} 
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0]
+                                            if (file) processAndUploadImage(file)
+                                        }}
+                                    />
                                 </div>
                                 <div className="modal-info" style={{ display: 'flex', flexDirection: 'column' }}>
                                     {isEditingBook ? (

@@ -370,6 +370,59 @@ body {
     display: block;
 }
 
+.modal-cover.is-editing {
+    cursor: pointer;
+    position: relative;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    transition: all 0.2s ease;
+}
+
+.modal-cover.is-editing:hover {
+    border-color: var(--accent);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.modal-cover.dragging {
+    border-color: var(--accent);
+    background: rgba(139, 123, 168, 0.2);
+    transform: scale(1.02);
+}
+
+.cover-upload-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    opacity: 0;
+    transition: opacity 0.2s;
+    text-align: center;
+    padding: 20px;
+}
+
+.modal-cover.is-editing:hover .cover-upload-overlay,
+.modal-cover.dragging .cover-upload-overlay {
+    opacity: 1;
+}
+
+.cover-upload-overlay span {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.cover-upload-overlay p {
+    font-size: 0.8rem;
+    opacity: 0.8;
+    margin: 0;
+}
+
 .modal-info {
     flex: 1;
 }

@@ -77,6 +77,16 @@ export const dataService = {
         }
     },
 
+    async uploadCover(username: string, isbn: string, imageData: string): Promise<string | null> {
+        try {
+            const res = await axios.post(`${API_BASE}/covers/upload`, { username, isbn, imageData })
+            return res.data?.coverPath || null
+        } catch (e) {
+            console.error('Upload cover error:', e)
+            return null
+        }
+    },
+
     getCoverUrl(book: Book) {
         if (!book.coverPath) return ''
         if (book.coverPath.startsWith('http')) return book.coverPath

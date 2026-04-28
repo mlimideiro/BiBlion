@@ -19,7 +19,8 @@ export function startServer(
     const app = express()
     const PORT = 3000
 
-    app.use(express.json())
+    app.use(express.json({ limit: '50mb' }))
+    app.use(express.urlencoded({ limit: '50mb', extended: true }))
     app.use(cors())
 
     const USERS_FILE = path.join(process.cwd(), 'db_biblion', 'users.json')
@@ -123,6 +124,33 @@ export function startServer(
             }
         } catch (error) {
             console.error(`[Server] Error renaming cover for ${username}:`, error)
+            res.status(500).json({ error: (error as Error).message })
+        }
+    })
+
+    app.post('/api/covers/upload', (req, res) => {
+        const { username, isbn, imageData } = req.body
+        if (!username || !isbn || !imageData) {
+            return res.status(400).json({ error: 'Missing parameters (username, isbn, imageData)' })
+        }
+
+        try {
+            const cleanIsbn = isbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+            const coversDir = path.join(process.cwd(), 'db_biblion', 'users', username, 'covers')
+            const localFilename = `${cleanIsbn}.jpg`
+            const localPath = path.join(coversDir, localFilename)
+
+            // Decode base64
+            const base64Data = imageData.replace(/^data:image\/\w+;base64,/, "")
+            const buffer = Buffer.from(base64Data, 'base64')
+
+            fsExtra.ensureDirSync(coversDir)
+            fs.writeFileSync(localPath, buffer)
+
+            console.log(`[Server] Manual cover upload for ${username}/${cleanIsbn} saved.`)
+            res.json({ success: true, coverPath: `local:${username}:${localFilename}` })
+        } catch (error) {
+            console.error(`[Server] Error uploading cover for ${username}:`, error)
             res.status(500).json({ error: (error as Error).message })
         }
     })
