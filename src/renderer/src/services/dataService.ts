@@ -99,6 +99,12 @@ export const dataService = {
             return `${API_BASE}/covers/${username}/${filename}`
         }
 
+        // Handle global:filename format
+        if (book.coverPath.startsWith('global:')) {
+            const filename = book.coverPath.split(':')[1]
+            return `${API_BASE}/covers/shared/${filename}`
+        }
+
         // Fallback: legacy global covers
         const filename = book.coverPath.split(/[/\\]/).pop()
         return `${API_BASE}/covers/${filename}`
@@ -115,6 +121,44 @@ export const dataService = {
             if (done) break
             const chunk = decoder.decode(value, { stream: true })
             onProgress(chunk)
+        }
+    },
+
+    async optimizeGlobalImages(onProgress: (msg: string) => void) {
+        try {
+            const response = await fetch(`${API_BASE}/admin/optimize-global-images`, { method: 'POST' })
+            const reader = response.body?.getReader()
+            const decoder = new TextDecoder()
+            if (!reader) return
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                onProgress(decoder.decode(value))
+            }
+        } catch (e) {
+            console.error('Optimize images error:', e)
+            onProgress('Error crítico en el servidor.')
+        }
+    },
+
+    async getSharedCovers(): Promise<any[]> {
+        try {
+            const res = await axios.get(`${API_BASE}/admin/shared-covers`)
+            return res.data
+        } catch (e) {
+            console.error('Get shared covers error:', e)
+            return []
+        }
+    },
+
+    async updateSharedCover(filename: string, data: { url?: string, imageData?: string }) {
+        try {
+            const res = await axios.post(`${API_BASE}/admin/shared-covers/update`, { filename, ...data })
+            return res.data.success
+        } catch (e) {
+            console.error('Update shared cover error:', e)
+            return false
         }
     }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { User, UserPlus, LogOut, Shield, Edit2, Trash2, Save, Settings, RefreshCw, Terminal } from 'lucide-react'
+import { User, UserPlus, LogOut, Shield, Edit2, Trash2, Save, Settings, RefreshCw, Terminal, Image as ImageIcon, ExternalLink, Maximize2 } from 'lucide-react'
 import { dataService } from '../services/dataService'
 
 interface AdminDashboardProps {
@@ -12,13 +12,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     const [newUserPass, setNewUserPass] = useState('')
     const [msg, setMsg] = useState('')
     const [error, setError] = useState('')
-    const [activeTab, setActiveTab] = useState<'users' | 'utils'>('users')
+    const [activeTab, setActiveTab] = useState<'users' | 'utils' | 'shared'>('users')
     const [syncLogs, setSyncLogs] = useState<string[]>([])
     const [isSyncing, setIsSyncing] = useState(false)
+    const [isOptimizing, setIsOptimizing] = useState(false)
+    const [sharedCovers, setSharedCovers] = useState<any[]>([])
+    const [loadingShared, setLoadingShared] = useState(false)
 
     useEffect(() => {
         loadUsers()
-    }, [])
+        if (activeTab === 'shared') loadSharedCovers()
+    }, [activeTab])
 
     const loadUsers = async () => {
         try {
@@ -123,7 +127,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     }
 
     const handleStartSync = async () => {
-        setSyncLogs(['Iniciando proceso...'])
+        setSyncLogs(['Iniciando proceso de sincronización...'])
         setIsSyncing(true)
         try {
             await dataService.syncCovers((chunk) => {
@@ -136,6 +140,112 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             setSyncLogs(prev => [...prev, `[ERROR FATAL] ${e.message}`])
         } finally {
             setIsSyncing(false)
+        }
+    }
+
+    const handleStartOptimize = async () => {
+        setSyncLogs(['Iniciando proceso de optimización global...'])
+        setIsOptimizing(true)
+        try {
+            await dataService.optimizeGlobalImages((chunk) => {
+                setSyncLogs(prev => {
+                    const lines = chunk.split('\n').filter(l => l.trim())
+                    return [...prev, ...lines]
+                })
+            })
+            loadSharedCovers()
+        } catch (e: any) {
+            setSyncLogs(prev => [...prev, `[ERROR FATAL] ${e.message}`])
+        } finally {
+            setIsOptimizing(false)
+        }
+    }
+
+    const loadSharedCovers = async () => {
+        setLoadingShared(true)
+        try {
+            const list = await dataService.getSharedCovers()
+            setSharedCovers(list)
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setLoadingShared(false)
+        }
+    }
+
+    const [editingShared, setEditingShared] = useState<any | null>(null)
+    const [newSharedUrl, setNewSharedUrl] = useState('')
+    const [isDraggingShared, setIsDraggingShared] = useState(false)
+    const dropRefShared = React.useRef<HTMLDivElement>(null)
+
+    const processAndUploadSharedImage = async (file: File) => {
+        if (!editingShared) return
+        if (!file.type.startsWith('image/')) {
+            alert('Por favor selecciona un archivo de imagen.')
+            return
+        }
+
+        const reader = new FileReader()
+        reader.onload = (e) => {
+            const img = new Image()
+            img.onload = async () => {
+                const canvas = document.createElement('canvas')
+                const MAX_WIDTH = 400
+                const scale = Math.min(1, MAX_WIDTH / img.width)
+                canvas.width = img.width * scale
+                canvas.height = img.height * scale
+
+                const ctx = canvas.getContext('2d')
+                if (!ctx) return
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+                const base64 = canvas.toDataURL('image/jpeg', 0.7)
+                const success = await dataService.updateSharedCover(editingShared.filename, { imageData: base64 })
+
+                if (success) {
+                    alert('Imagen compartida actualizada correctamente')
+                    setEditingShared(null)
+                    loadSharedCovers()
+                } else {
+                    alert('Error al actualizar la imagen.')
+                }
+            }
+            img.src = e.target?.result as string
+        }
+        reader.readAsDataURL(file)
+    }
+
+    const handleSharedDragOver = (e: React.DragEvent) => {
+        e.preventDefault()
+        setIsDraggingShared(true)
+    }
+
+    const handleSharedDragLeave = (e: React.DragEvent) => {
+        e.preventDefault()
+        setIsDraggingShared(false)
+    }
+
+    const handleSharedDrop = (e: React.DragEvent) => {
+        e.preventDefault()
+        setIsDraggingShared(false)
+        const file = e.dataTransfer.files[0]
+        if (file) processAndUploadSharedImage(file)
+    }
+
+    const handleUpdateShared = async () => {
+        if (!editingShared) return
+        try {
+            const success = await dataService.updateSharedCover(editingShared.filename, { url: newSharedUrl })
+            if (success) {
+                alert('Imagen compartida actualizada correctamente')
+                setEditingShared(null)
+                setNewSharedUrl('')
+                loadSharedCovers()
+            } else {
+                alert('Error al actualizar')
+            }
+        } catch (e) {
+            alert('Error de conexión')
         }
     }
 
@@ -159,6 +269,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                         onClick={() => setActiveTab('utils')}
                     >
                         <Settings size={18} /> Utilidades
+                    </button>
+                    <button 
+                        className={`nav-item ${activeTab === 'shared' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('shared')}
+                    >
+                        <ImageIcon size={18} /> Banco Imágenes
                     </button>
                 </nav>
 
@@ -238,7 +354,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                             </div>
                         </div>
                     </>
-                ) : (
+                ) : activeTab === 'utils' ? (
                     <>
                         <header>
                             <h1>Utilidades de Sistema</h1>
@@ -247,25 +363,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                         
                         <div className="admin-grid" style={{ gridTemplateColumns: '1fr' }}>
                             <div className="admin-card sync-card">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                                    <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '30px' }}>
+                                    <div style={{ flex: 1 }}>
                                         <h3><RefreshCw size={20} className={isSyncing ? 'spin-anim' : ''} /> Sincronización Tapas</h3>
                                         <p style={{ fontSize: '0.9rem', color: '#888', maxWidth: '600px', margin: '10px 0 0' }}>
-                                            Este script recorre todos los usuarios del sistema para normalizar sus portadas:
-                                            <ul style={{ paddingLeft: '20px', marginTop: '10px' }}>
-                                                <li>Descarga imágenes desde enlaces externos (HTTP).</li>
-                                                <li>Renombra archivos con nombres temporales (manual/wish) al ISBN final.</li>
-                                                <li>Corrige enlaces rotos por desincronización de ISBN.</li>
-                                            </ul>
+                                            Normaliza portadas (descarga URLs y corrige ISBNs).
                                         </p>
                                     </div>
                                     <button 
                                         className="create-btn" 
                                         style={{ width: 'auto', padding: '12px 30px' }}
                                         onClick={handleStartSync}
-                                        disabled={isSyncing}
+                                        disabled={isSyncing || isOptimizing}
                                     >
                                         {isSyncing ? 'Sincronizando...' : 'Comenzar Sincronización'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="admin-card sync-card">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '30px' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <h3><Maximize2 size={20} className={isOptimizing ? 'spin-anim' : ''} /> Optimizar Imágenes Globales</h3>
+                                        <p style={{ fontSize: '0.9rem', color: '#888', maxWidth: '600px', margin: '10px 0 0' }}>
+                                            Mueve portadas duplicadas a un banco compartido para ahorrar espacio.
+                                        </p>
+                                    </div>
+                                    <button 
+                                        className="create-btn" 
+                                        style={{ width: 'auto', padding: '12px 30px' }}
+                                        onClick={handleStartOptimize}
+                                        disabled={isSyncing || isOptimizing}
+                                    >
+                                        {isOptimizing ? 'Optimizando...' : 'Comenzar Optimización'}
                                     </button>
                                 </div>
 
@@ -278,11 +408,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                             {syncLogs.map((log, i) => (
                                                 <div key={i} className="log-line">{log}</div>
                                             ))}
-                                            {isSyncing && <div className="log-cursor">_</div>}
+                                            {(isSyncing || isOptimizing) && <div className="log-cursor">_</div>}
                                         </div>
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <header>
+                            <h1>Banco Global de Imágenes</h1>
+                            <p>Gestiona las portadas compartidas que ahorran espacio en el servidor.</p>
+                        </header>
+
+                        <div className="shared-covers-grid">
+                            {loadingShared ? (
+                                <div className="empty-state">Cargando banco de imágenes...</div>
+                            ) : sharedCovers.length === 0 ? (
+                                <div className="empty-state">No hay imágenes en el banco global. Ejecuta la optimización primero.</div>
+                            ) : (
+                                sharedCovers.map(cover => (
+                                    <div key={cover.filename} className="shared-cover-item">
+                                        <div className="shared-cover-img">
+                                            <img src={`/api/covers/shared/${cover.filename}`} alt={cover.filename} />
+                                        </div>
+                                        <div className="shared-cover-info">
+                                            <div className="shared-isbn">{cover.filename.split('.')[0]}</div>
+                                            <div className="shared-meta">{Math.round(cover.size / 1024)} KB</div>
+                                            <button className="edit-shared-btn" onClick={() => setEditingShared(cover)}>
+                                                <Edit2 size={14} /> Editar
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </>
                 )}
@@ -316,6 +476,62 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                 <Save size={18} />
                                 <span>Guardar</span>
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {editingShared && (
+                <div className="modal-overlay" onClick={() => setEditingShared(null)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', background: '#1e1e26', padding: '30px' }}>
+                        <h3>Editar Portada Global</h3>
+                        <p style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '20px' }}>ISBN: {editingShared.filename.split('.')[0]}</p>
+                        
+                        <div className="form-group">
+                            <label>Nueva URL de Imagen</label>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <input 
+                                    type="text" 
+                                    className="admin-input" 
+                                    value={newSharedUrl}
+                                    onChange={e => setNewSharedUrl(e.target.value)}
+                                    placeholder="https://..."
+                                />
+                                <button className="action-btn" onClick={handleUpdateShared} style={{ background: '#a78bfa', color: '#000', padding: '0 20px' }}>
+                                    Ir
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="separator" style={{ margin: '20px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', height: '10px' }}>
+                            <span style={{ background: '#1e1e26', padding: '0 10px', fontSize: '0.8rem', color: '#666' }}>O SUBE UN ARCHIVO</span>
+                        </div>
+
+                        <div 
+                            className={`modal-cover-dropzone ${isDraggingShared ? 'dragging' : ''}`}
+                            onDragOver={handleSharedDragOver}
+                            onDragLeave={handleSharedDragLeave}
+                            onDrop={handleSharedDrop}
+                            onClick={() => {
+                                const input = document.createElement('input')
+                                input.type = 'file'
+                                input.accept = 'image/*'
+                                input.onchange = (e) => {
+                                    const file = (e.target as HTMLInputElement).files?.[0]
+                                    if (file) processAndUploadSharedImage(file)
+                                }
+                                input.click()
+                            }}
+                            style={{ padding: '30px', textAlign: 'center', border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
+                        >
+                            <div style={{ color: '#aaa' }}>
+                                <ImageIcon size={30} style={{ marginBottom: '10px', opacity: 0.5 }} />
+                                <p style={{ margin: 0, fontSize: '0.9rem' }}>Arrastra una foto o haz clic para subir</p>
+                            </div>
+                        </div>
+
+                        <div className="modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '25px' }}>
+                            <button className="action-btn secondary" onClick={() => setEditingShared(null)}>Cerrar</button>
                         </div>
                     </div>
                 </div>
@@ -384,11 +600,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     display: grid;
                     grid-template-columns: 1fr 1fr;
                     gap: 30px;
+                    max-width: 1200px;
                 }
                 .admin-card {
                     background: #1e1e26;
                     border-radius: 16px;
-                    padding: 30px;
+                    padding: 40px;
                     border: 1px solid rgba(255,255,255,0.05);
                 }
                 .admin-card h3 {
@@ -586,6 +803,92 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 .modal-content {
                     border-radius: 20px;
                     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+                }
+                .shared-covers-grid {
+                    display: grid;
+                    grid-template-columns: repeat(6, 1fr);
+                    gap: 30px;
+                    max-width: 1200px;
+                }
+                @media (max-width: 1400px) {
+                    .shared-covers-grid {
+                        grid-template-columns: repeat(4, 1fr);
+                    }
+                }
+                @media (max-width: 1100px) {
+                    .shared-covers-grid {
+                        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                    }
+                }
+                .shared-cover-item {
+                    background: #1e1e26;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    border: 1px solid rgba(255,255,255,0.05);
+                    transition: transform 0.2s;
+                }
+                .shared-cover-item:hover {
+                    transform: translateY(-5px);
+                    border-color: rgba(167, 139, 250, 0.3);
+                }
+                .shared-cover-img {
+                    height: 250px;
+                    background: #000;
+                }
+                .shared-cover-img img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
+                .shared-cover-info {
+                    padding: 12px;
+                }
+                .shared-isbn {
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    margin-bottom: 4px;
+                }
+                .shared-meta {
+                    font-size: 0.75rem;
+                    color: #888;
+                    margin-bottom: 10px;
+                }
+                .edit-shared-btn {
+                    width: 100%;
+                    background: rgba(255,255,255,0.05);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    color: #aaa;
+                    padding: 6px;
+                    border-radius: 6px;
+                    font-size: 0.75rem;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 6px;
+                }
+                .edit-shared-btn:hover {
+                    background: #a78bfa;
+                    color: #000;
+                }
+                .action-btn {
+                    padding: 8px 16px;
+                    border-radius: 8px;
+                    border: none;
+                    cursor: pointer;
+                    font-weight: 600;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .action-btn.secondary {
+                    background: transparent;
+                    color: #aaa;
+                    border: 1px solid #444;
+                }
+                .modal-cover-dropzone.dragging {
+                    background: rgba(167, 139, 250, 0.1);
+                    border-color: #a78bfa !important;
                 }
             `}</style>
         </div>

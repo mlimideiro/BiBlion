@@ -84,6 +84,16 @@ export function startServer(
         res.json(config)
     })
 
+    app.get('/api/covers/shared/:filename', (req, res) => {
+        const { filename } = req.params
+        const sharedPath = path.join(process.cwd(), 'db_biblion', 'covers', 'shared', filename)
+        if (fs.existsSync(sharedPath)) {
+            res.sendFile(sharedPath)
+        } else {
+            res.status(404).json({ error: 'Shared cover not found' })
+        }
+    })
+
     app.get('/api/covers/:username/:filename', (req, res) => {
         const { username, filename } = req.params
         const filePath = path.join(process.cwd(), 'db_biblion', 'users', username, 'covers', filename)
@@ -151,6 +161,57 @@ export function startServer(
             res.json({ success: true, coverPath: `local:${username}:${localFilename}` })
         } catch (error) {
             console.error(`[Server] Error uploading cover for ${username}:`, error)
+            res.status(500).json({ error: (error as Error).message })
+        }
+    })
+
+    app.post('/api/admin/optimize-global-images', async (_req, res) => {
+        console.log('[Admin] Request for optimize-global-images...')
+        res.setHeader('Content-Type', 'text/plain')
+        await adminUtils.optimizeGlobalImages((msg) => {
+            res.write(msg + '\n')
+        })
+        res.end()
+    })
+
+    app.get('/api/admin/shared-covers', (_req, res) => {
+        try {
+            const SHARED_DIR = path.join(process.cwd(), 'db_biblion', 'covers', 'shared')
+            fsExtra.ensureDirSync(SHARED_DIR)
+            const files = fs.readdirSync(SHARED_DIR)
+                .filter(f => f.endsWith('.jpg') || f.endsWith('.png'))
+                .map(f => {
+                    const stats = fs.statSync(path.join(SHARED_DIR, f))
+                    return {
+                        filename: f,
+                        size: stats.size,
+                        updatedAt: stats.mtime
+                    }
+                })
+            res.json(files)
+        } catch (error) {
+            res.status(500).json({ error: (error as Error).message })
+        }
+    })
+
+    app.post('/api/admin/shared-covers/update', async (req, res) => {
+        const { filename, url, imageData } = req.body
+        const SHARED_DIR = path.join(process.cwd(), 'db_biblion', 'covers', 'shared')
+        const targetPath = path.join(SHARED_DIR, filename)
+
+        try {
+            if (imageData) {
+                const base64Data = imageData.replace(/^data:image\/\w+;base64,/, "")
+                const buffer = Buffer.from(base64Data, 'base64')
+                fs.writeFileSync(targetPath, buffer)
+                return res.json({ success: true })
+            } else if (url) {
+                const response = await axios.get(url, { responseType: 'arraybuffer' })
+                fs.writeFileSync(targetPath, Buffer.from(response.data))
+                return res.json({ success: true })
+            }
+            res.status(400).json({ error: 'No data or URL provided' })
+        } catch (error) {
             res.status(500).json({ error: (error as Error).message })
         }
     })

@@ -21,6 +21,7 @@ export interface Book {
     loanDate?: string
     notes?: string
     tags?: string[]
+    coverType?: 'manual' | 'auto'
 }
 
 export interface Library {
@@ -149,6 +150,7 @@ export class DataManager {
             title: book.title || 'Sin Título',
             authors: Array.isArray(book.authors) ? book.authors : (book.author ? [book.author] : []),
             tags: Array.isArray(book.tags) ? book.tags : [],
+            coverType: book.coverType || (book.coverPath?.startsWith('local:') ? 'auto' : undefined),
             createdAt: book.createdAt || new Date().toISOString(),
             updatedAt: book.updatedAt || new Date().toISOString()
         }

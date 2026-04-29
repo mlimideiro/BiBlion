@@ -504,7 +504,7 @@ function App() {
                 const newPath = await dataService.uploadCover(currentUser, selectedBook.isbn, base64)
 
                 if (newPath) {
-                    handleEditSave({ coverPath: newPath })
+                    handleEditSave({ coverPath: newPath, coverType: 'manual' })
                 } else {
                     alert('Error al subir la imagen al servidor.')
                 }

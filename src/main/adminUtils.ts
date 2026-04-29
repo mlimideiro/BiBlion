@@ -96,6 +96,93 @@ export class AdminUtils {
     logCallback('\n--- Sincronización Finalizada ---')
   }
 
+  async optimizeGlobalImages(logCallback: (msg: string) => void) {
+    const USERS_ROOT = path.join(process.cwd(), 'db_biblion', 'users')
+    const SHARED_DIR = path.join(process.cwd(), 'db_biblion', 'covers', 'shared')
+    fsExtra.ensureDirSync(SHARED_DIR)
+
+    if (!fs.existsSync(USERS_ROOT)) {
+      logCallback('Error: No users directory found.')
+      return
+    }
+
+    const users = fs.readdirSync(USERS_ROOT).filter(f => 
+       fs.statSync(path.join(USERS_ROOT, f)).isDirectory()
+    )
+
+    logCallback(`Iniciando Optimización Global entre ${users.length} usuarios...`)
+
+    // 1. Collect candidates
+    const isbnMap = new Map<string, Array<{ username: string, book: any, localPath: string, size: number }>>()
+
+    for (const username of users) {
+      const books = this.dataManager.getAllBooks(username)
+      for (const book of books) {
+        // Only process automatic covers with valid ISBN
+        if (book.coverType === 'auto' && book.coverPath?.startsWith('local:')) {
+          const cleanIsbn = book.isbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+          if (!cleanIsbn) continue
+
+          const filename = book.coverPath.split(':').pop() || ''
+          const localPath = path.join(USERS_ROOT, username, 'covers', filename)
+
+          if (fs.existsSync(localPath)) {
+            const stats = fs.statSync(localPath)
+            const list = isbnMap.get(cleanIsbn) || []
+            list.push({ username, book, localPath, size: stats.size })
+            isbnMap.set(cleanIsbn, list)
+          }
+        }
+      }
+    }
+
+    // 2. Process duplicates
+    let totalMoved = 0
+    let totalSaved = 0
+
+    for (const [isbn, occurrences] of isbnMap.entries()) {
+      if (occurrences.length > 1) {
+        logCallback(`\n[ISBN: ${isbn}] Encontrado en ${occurrences.length} usuarios.`)
+        
+        // Pick best (largest size)
+        occurrences.sort((a, b) => b.size - a.size)
+        const best = occurrences[0]
+        const sharedPath = path.join(SHARED_DIR, `${isbn}.jpg`)
+
+        try {
+          // Move best to shared (or just copy if we want to be safe)
+          fs.copyFileSync(best.localPath, sharedPath)
+          logCallback(`  -> Imagen compartida creada (${Math.round(best.size / 1024)} KB)`)
+
+          // Update all users
+          for (const occ of occurrences) {
+            const userBooks = this.dataManager.getAllBooks(occ.username)
+            const bookIndex = userBooks.findIndex(b => b.isbn === occ.book.isbn)
+            
+            if (bookIndex >= 0) {
+              userBooks[bookIndex].coverPath = `global:${isbn}.jpg`
+              this.dataManager.saveBooks(occ.username, userBooks)
+              
+              // Delete local copy
+              if (fs.existsSync(occ.localPath)) {
+                fs.unlinkSync(occ.localPath)
+                totalSaved += occ.size
+              }
+              logCallback(`  [OK] Usuario ${occ.username} actualizado.`)
+            }
+          }
+          totalMoved++
+        } catch (e: any) {
+          logCallback(`  [Error] Falló optimización para ${isbn}: ${e.message}`)
+        }
+      }
+    }
+
+    logCallback(`\n--- Optimización Finalizada ---`)
+    logCallback(`Libros optimizados: ${totalMoved}`)
+    logCallback(`Espacio recuperado: ${Math.round(totalSaved / 1024)} KB`)
+  }
+
   private async downloadCover(url: string, dest: string): Promise<boolean> {
     try {
       const response = await axios.get(url, {
