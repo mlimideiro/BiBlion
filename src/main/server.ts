@@ -9,6 +9,7 @@ import { DataManager, Book } from './dataManager'
 import { MetadataService } from './metadataService'
 import { ScraperService } from './scraperService'
 import { AdminUtils } from './adminUtils'
+import AdmZip from 'adm-zip'
 
 export function startServer(
     dataManager: DataManager,
@@ -254,50 +255,60 @@ export function startServer(
     })
 
     // Helper: download external cover to per-user local storage (fire & forget)
-    const downloadCoverToLocal = (username: string, isbn: string, coverUrl: string) => {
+    const downloadCoverToLocal = async (username: string, isbn: string, coverUrl: string) => {
         if (!coverUrl || !coverUrl.startsWith('http')) return
         const cleanIsbn = isbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
-        const coversDir = path.join(process.cwd(), 'db_biblion', 'users', username, 'covers')
         const localFilename = `${cleanIsbn}.jpg`
+        const coversDir = path.join(process.cwd(), 'db_biblion', 'users', username, 'covers')
         const localPath = path.join(coversDir, localFilename)
+
+        // 1. Check if the book already points to local
+        const books = dataManager.getAllBooks(username)
+        const idx = books.findIndex(b => b.isbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() === cleanIsbn)
         
+        if (idx >= 0) {
+            const book = books[idx]
+            if (book.coverPath === `local:${username}:${localFilename}` && fs.existsSync(localPath)) {
+                return // Everything ok, skip
+            }
+        }
+
+        // 2. If file exists but record doesn't, update record and skip download
         if (fs.existsSync(localPath)) {
-            // Update the book path if it was left as HTTP even when cached
-            const books = dataManager.getAllBooks(username)
-            const idx = books.findIndex(b => b.isbn.replace(/[^a-zA-Z0-9]/g, '') === cleanIsbn)
-            if (idx >= 0 && books[idx].coverPath !== `local:${username}:${localFilename}`) {
+            if (idx >= 0) {
                 books[idx].coverUrl = books[idx].coverUrl || books[idx].coverPath
                 books[idx].coverPath = `local:${username}:${localFilename}`
-                const userDir = path.join(process.cwd(), 'db_biblion', 'users', username)
-                const booksFile = path.join(userDir, 'books.json')
-                fsExtra.writeJsonSync(booksFile, books, { spaces: 2 })
+                dataManager.saveBooks(username, [books[idx]])
+                console.log(`[Cover] Sync: Record updated for existing file ${cleanIsbn}`)
             }
             return
         }
 
-        axios.get(coverUrl, {
-            responseType: 'arraybuffer',
-            timeout: 15000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-        })
-            .then(response => {
-                fsExtra.ensureDirSync(coversDir)
-                fs.writeFileSync(localPath, Buffer.from(response.data))
-                // Update the book: preserve original URL in coverUrl, switch coverPath to local
-                const books = dataManager.getAllBooks(username)
-                const idx = books.findIndex(b => b.isbn.replace(/[^a-zA-Z0-9]/g, '') === cleanIsbn)
-                if (idx >= 0) {
-                    books[idx].coverUrl = coverUrl  // Preserve original for backup/restore
-                    books[idx].coverPath = `local:${username}:${localFilename}`
-                    const userDir = path.join(process.cwd(), 'db_biblion', 'users', username)
-                    const booksFile = path.join(userDir, 'books.json')
-                    fsExtra.writeJsonSync(booksFile, books, { spaces: 2 })
-                    console.log(`[Cover] Cached locally for ${username}/${cleanIsbn}`)
+        // 3. Download from external URL
+        try {
+            const response = await axios.get(coverUrl, {
+                responseType: 'arraybuffer',
+                timeout: 15000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                 }
             })
-            .catch(e => console.warn(`[Cover] Download failed for ${isbn}:`, e.message))
+
+            fsExtra.ensureDirSync(coversDir)
+            fs.writeFileSync(localPath, Buffer.from(response.data))
+
+            // Update database
+            const currentBooks = dataManager.getAllBooks(username)
+            const currentIdx = currentBooks.findIndex(b => b.isbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() === cleanIsbn)
+            if (currentIdx >= 0) {
+                currentBooks[currentIdx].coverUrl = coverUrl
+                currentBooks[currentIdx].coverPath = `local:${username}:${localFilename}`
+                dataManager.saveBooks(username, [currentBooks[currentIdx]])
+                console.log(`[Cover] Downloaded and cached: ${username}/${cleanIsbn}`)
+            }
+        } catch (e) {
+            console.warn(`[Cover] Download failed for ${isbn} (${coverUrl}): ${(e as Error).message}`)
+        }
     }
 
     app.post('/api/save', (req, res) => {
@@ -370,15 +381,19 @@ export function startServer(
 
                 // Background: re-download covers for imported books that have coverUrl
                 const allBooks = dataManager.getAllBooks(username)
+                let queuedCount = 0
                 let delay = 0
                 for (const book of allBooks) {
                     const url = book.coverUrl || (book.coverPath?.startsWith('http') ? book.coverPath : null)
                     if (url) {
+                        queuedCount++
                         setTimeout(() => downloadCoverToLocal(username, book.isbn, url), delay)
-                        delay += 500 // Stagger downloads to avoid overwhelming servers
+                        delay += 300 // Slightly faster but still staggered
                     }
                 }
-                if (delay > 0) console.log(`[Import] Queued cover downloads for ${Math.floor(delay / 500)} books`)
+                if (queuedCount > 0) {
+                    console.log(`[Import] Queued cover downloads for ${queuedCount} books. Total estimation: ${Math.round(delay/1000)}s`)
+                }
             } else {
                 res.status(400).json({ error: "Invalid format: username, books, and valid mode (merge/replace) are required" })
             }
@@ -408,6 +423,135 @@ export function startServer(
         console.log('Updating config from mobile/web', username)
         dataManager.saveConfig(username, configData)
         res.json({ success: true })
+    })
+
+    // --- BACKUP SYSTEM ---
+
+    app.get('/api/backup/export', (req, res) => {
+        const { username } = req.query
+        if (!username) return res.status(400).json({ error: 'Username is required' })
+
+        console.log(`[Backup] Exporting data for ${username}...`)
+        try {
+            const userDir = path.join(process.cwd(), 'db_biblion', 'users', username as string)
+            const coversDir = path.join(userDir, 'covers')
+            const booksFile = path.join(userDir, 'books.json')
+            const configFile = path.join(userDir, 'config.json')
+
+            const zip = new AdmZip()
+
+            // 1. Add JSON files
+            if (fs.existsSync(booksFile)) {
+                zip.addLocalFile(booksFile)
+            }
+            if (fs.existsSync(configFile)) {
+                zip.addLocalFile(configFile)
+            }
+
+            // 2. Add covers (ONLY manual ones)
+            if (fs.existsSync(coversDir) && fs.existsSync(booksFile)) {
+                const books = JSON.parse(fs.readFileSync(booksFile, 'utf8'))
+                const manualFilenames = new Set<string>()
+
+                books.forEach((book: any) => {
+                    if (book.coverType === 'manual' && book.coverPath?.startsWith('local:')) {
+                        const parts = book.coverPath.split(':')
+                        if (parts.length === 3) {
+                            manualFilenames.add(parts[2])
+                        }
+                    }
+                })
+
+                // Also include anything starting with MANUAL in the filename (for safety/manual books)
+                const allFiles = fs.readdirSync(coversDir)
+                allFiles.forEach(f => {
+                    if (f.toUpperCase().startsWith('MANUAL')) {
+                        manualFilenames.add(f)
+                    }
+                })
+
+                if (manualFilenames.size > 0) {
+                    manualFilenames.forEach(filename => {
+                        const filePath = path.join(coversDir, filename)
+                        if (fs.existsSync(filePath)) {
+                            zip.addLocalFile(filePath, 'covers')
+                        }
+                    })
+                }
+            }
+
+            const buffer = zip.toBuffer()
+            const date = new Date().toISOString().split('T')[0]
+            const filename = `biblion_backup_${username}_${date}.zip`
+
+            res.set('Content-Type', 'application/zip')
+            res.set('Content-Disposition', `attachment; filename=${filename}`)
+            res.send(buffer)
+            console.log(`[Backup] Export successful: ${filename} (${Math.round(buffer.length / 1024)} KB)`)
+        } catch (error) {
+            console.error('[Backup] Export error:', error)
+            res.status(500).json({ error: (error as Error).message })
+        }
+    })
+
+    app.post('/api/backup/import', (req, res) => {
+        const { username, zipData, mode } = req.body
+        if (!username || !zipData) return res.status(400).json({ error: 'Username and zipData are required' })
+
+        console.log(`[Backup] Importing data for ${username} (Mode: ${mode})...`)
+        try {
+            const buffer = Buffer.from(zipData, 'base64')
+            const zip = new AdmZip(buffer)
+            const zipEntries = zip.getEntries()
+
+            const userDir = path.join(process.cwd(), 'db_biblion', 'users', username)
+            const coversDir = path.join(userDir, 'covers')
+            fsExtra.ensureDirSync(coversDir)
+
+            let booksJson: any[] | null = null
+            let configJson: any = null
+
+            // 1. Extract and find JSON data first
+            zipEntries.forEach((entry) => {
+                if (entry.entryName === 'books.json') {
+                    booksJson = JSON.parse(entry.getData().toString('utf8'))
+                } else if (entry.entryName === 'config.json') {
+                    configJson = JSON.parse(entry.getData().toString('utf8'))
+                }
+            })
+
+            if (!booksJson) {
+                return res.status(400).json({ error: 'Invalid backup: books.json not found in ZIP' })
+            }
+
+            // 2. Restore covers
+            zipEntries.forEach((entry) => {
+                if (entry.entryName.startsWith('covers/') && !entry.isDirectory) {
+                    const filename = entry.entryName.split('/').pop()
+                    if (filename) {
+                        const targetPath = path.join(coversDir, filename)
+                        fs.writeFileSync(targetPath, entry.getData())
+                    }
+                }
+            })
+
+            // 3. Update Database
+            if (mode === 'replace') {
+                dataManager.importBooks(username, booksJson, 'replace')
+                if (configJson) dataManager.saveConfig(username, configJson)
+            } else {
+                // Merge mode
+                dataManager.importBooks(username, booksJson, 'merge')
+                // For config, we usually don't want to overwrite libraries/tags in merge mode 
+                // unless they are completely missing.
+            }
+
+            console.log(`[Backup] Import successful for ${username}`)
+            res.json({ success: true, books: dataManager.getAllBooks(username) })
+        } catch (error) {
+            console.error('[Backup] Import error:', error)
+            res.status(500).json({ error: (error as Error).message })
+        }
     })
 
     app.get('/api/scrape', async (req, res) => {

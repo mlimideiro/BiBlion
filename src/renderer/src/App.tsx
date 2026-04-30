@@ -213,16 +213,8 @@ function App() {
     }
 
     const handleExport = () => {
-        const dataStr = JSON.stringify(books, null, 2)
-        const dataBlob = new Blob([dataStr], { type: 'application/json' })
-        const url = URL.createObjectURL(dataBlob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `biblion_backup_${new Date().toISOString().split('T')[0]}.json`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(url)
+        if (!currentUser) return
+        dataService.exportBackup(currentUser)
         setMenuOpen(false)
     }
 
@@ -235,54 +227,66 @@ function App() {
 
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0]
-        console.log("File selected:", file)
         if (!file) return
 
-        const reader = new FileReader()
-        reader.onload = (e) => {
-            try {
-                const content = e.target?.result as string
-                console.log("File content length:", content.length)
-                const json = JSON.parse(content)
-                console.log("Parsed JSON array length:", json.length)
-                if (Array.isArray(json)) {
-                    setImportFile(file)
-                    setImportBooksCount(json.length)
-                    setImportModalOpen(true)
-                } else {
-                    alert("El archivo no tiene el formato correcto (debe ser una lista de libros).")
+        if (file.name.endsWith('.json')) {
+            // Legacy JSON import
+            const reader = new FileReader()
+            reader.onload = (e) => {
+                try {
+                    const content = e.target?.result as string
+                    const json = JSON.parse(content)
+                    if (Array.isArray(json)) {
+                        setImportFile(file)
+                        setImportBooksCount(json.length)
+                        setImportModalOpen(true)
+                    } else {
+                        alert("El archivo JSON no tiene el formato correcto.")
+                    }
+                } catch (error) {
+                    alert("Error al leer el archivo JSON.")
                 }
-            } catch (error) {
-                console.error("Error parsing JSON:", error)
-                alert("Error al leer el archivo JSON.")
             }
+            reader.readAsText(file)
+        } else if (file.name.endsWith('.zip')) {
+            // New ZIP import
+            setImportFile(file)
+            setImportBooksCount(0) // Will be determined on server or we could try to read it here if needed
+            setImportModalOpen(true)
         }
-        reader.readAsText(file)
+
         // Reset input
         event.target.value = ''
     }
 
     const processImport = async (mode: 'merge' | 'replace') => {
-        if (!importFile || !currentUser) {
-            console.error("Missing importFile or currentUser", { importFile, currentUser })
-            return
-        }
+        if (!importFile || !currentUser) return
         setImporting(true)
-        console.log("Starting import in mode:", mode)
         try {
-            const reader = new FileReader()
-            reader.onload = async (e) => {
-                const content = e.target?.result as string
-                const json = JSON.parse(content)
-                console.log("Calling dataService.importBooks...")
-                const updatedBooks = await dataService.importBooks(currentUser, json, mode)
-                console.log("Import success, updated books count:", updatedBooks.length)
-                setBooks(updatedBooks)
-                setImportModalOpen(false)
-                setImportFile(null)
-                alert(`Importación completada con éxito (${mode === 'merge' ? 'Mezclar' : 'Reemplazar'}).`)
+            if (importFile.name.endsWith('.json')) {
+                const reader = new FileReader()
+                reader.onload = async (e) => {
+                    const content = e.target?.result as string
+                    const json = JSON.parse(content)
+                    const updatedBooks = await dataService.importBooks(currentUser, json, mode)
+                    setBooks(updatedBooks)
+                    setImportModalOpen(false)
+                    setImportFile(null)
+                    alert(`Importación JSON completada (${mode === 'merge' ? 'Mezclar' : 'Reemplazar'}).`)
+                }
+                reader.readAsText(importFile)
+            } else if (importFile.name.endsWith('.zip')) {
+                const reader = new FileReader()
+                reader.onload = async (e) => {
+                    const base64 = (e.target?.result as string).split(',')[1]
+                    const updatedBooks = await dataService.importBackupZip(currentUser, base64, mode)
+                    setBooks(updatedBooks)
+                    setImportModalOpen(false)
+                    setImportFile(null)
+                    alert(`Importación ZIP completada con éxito.`)
+                }
+                reader.readAsDataURL(importFile)
             }
-            reader.readAsText(importFile)
         } catch (error) {
             alert("Error durante la importación.")
             console.error("Import error:", error)
@@ -720,7 +724,7 @@ function App() {
                                 type="file"
                                 ref={fileInputRef}
                                 style={{ display: 'none' }}
-                                accept=".json"
+                                accept=".json,.zip"
                                 onChange={handleFileSelect}
                             />
                         </div>

@@ -160,5 +160,20 @@ export const dataService = {
             console.error('Update shared cover error:', e)
             return false
         }
+    },
+
+    async exportBackup(username: string) {
+        const url = `${API_BASE}/backup/export?username=${username}`
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `biblion_backup_${username}_${new Date().toISOString().split('T')[0]}.zip`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    },
+
+    async importBackupZip(username: string, zipData: string, mode: 'merge' | 'replace'): Promise<Book[]> {
+        const res = await axios.post(`${API_BASE}/backup/import`, { username, zipData, mode })
+        return res.data.books
     }
 }
