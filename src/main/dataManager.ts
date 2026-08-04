@@ -58,6 +58,7 @@ export class DataManager {
         fs.ensureDirSync(DB_PATH)
         fs.ensureDirSync(BACKUP_DIR)
         fs.ensureDirSync(COVERS_DIR)
+        fs.ensureDirSync(path.join(DB_PATH, 'cache', 'metadata'))
 
         // Ensure legacy files exist just in case
         if (!fs.existsSync(LEGACY_DB_FILE)) {

@@ -39,6 +39,8 @@ export class ScraperService {
                 data = this.parseCasaDelLibro(html)
             } else if (finalUrl.includes('lecturalia.com')) {
                 data = this.parseLecturalia(html)
+            } else if (finalUrl.includes('mercadolibre.com')) {
+                data = this.parseMercadoLibre(html, finalUrl)
             } else {
                 data = this.parseGeneric(html)
             }
@@ -88,7 +90,7 @@ export class ScraperService {
     }
 
     public async findByIsbn(isbn: string): Promise<ScrapedData | null> {
-        console.log(`[ScraperService] Searching bookstores for ISBN: ${isbn}`)
+        console.log(`[ScraperService] Searching bookstores in parallel for ISBN: ${isbn}`)
 
         const stores = [
             { name: 'Buscalibre', url: `https://www.buscalibre.com.ar/libros/search?q=${isbn}` },
@@ -97,40 +99,53 @@ export class ScraperService {
             { name: 'CasaDelLibro', url: `https://www.casadellibro.com/buscar?q=${isbn}` },
             { name: 'Tematika', url: `https://www.tematika.com/catalogsearch/result/?q=${isbn}` },
             { name: 'Galerna', url: `https://www.galernaweb.com/resultados.aspx?c=${isbn}&por=isbn` },
-            { name: 'Lecturalia', url: `https://www.lecturalia.com/search?q=${isbn}` }
+            { name: 'Lecturalia', url: `https://www.lecturalia.com/search?q=${isbn}` },
+            { name: 'MercadoLibre', url: `https://listado.mercadolibre.com.ar/${isbn}` }
         ]
 
-        for (const store of stores) {
+        // Map each store to a promise
+        const tasks: Promise<ScrapedData | null>[] = stores.map(async (store) => {
             try {
-                // Wait briefly between stores to avoid being blocked
-                await new Promise(resolve => setTimeout(resolve, 800))
-
+                // Add a small staggered delay to avoid instant spike but much faster than before
+                const storeIdx = stores.indexOf(store)
+                await new Promise(resolve => setTimeout(resolve, storeIdx * 400))
+                
                 const data = await this.scrape(store.url)
                 if (data && this.isValidBookData(data)) {
                     console.log(`[ScraperService] Found on ${store.name}: ${data.title}`)
                     return { ...data, isbn }
-                } else if (data) {
-                    console.log(`[ScraperService] ${store.name} returned invalid/error result: ${data.title}`)
                 }
+                return null
             } catch (e) {
-                console.warn(`[ScraperService] Error searching ${store.name}:`, e)
+                console.warn(`[ScraperService] Error searching ${store.name}:`, (e as Error).message)
+                return null
             }
-        }
+        })
 
-        return null
+        // Wait for all to settle
+        const results = await Promise.allSettled(tasks)
+        
+        // Pick the best result (one with a cover and description if possible)
+        const validResults = results
+            .filter((r): r is PromiseFulfilledResult<ScrapedData | null> => r.status === 'fulfilled')
+            .map(r => r.value)
+            .filter((v): v is ScrapedData => v !== null)
+
+        if (validResults.length === 0) return null
+
+        // Sort by completeness
+        validResults.sort((a, b) => {
+            const score = (x: ScrapedData) => (x.coverPath ? 2 : 0) + (x.description ? 1 : 0) + (x.publisher ? 0.5 : 0)
+            return score(b) - score(a)
+        })
+
+        return validResults[0]
     }
 
     private isValidBookData(data: ScrapedData): boolean {
         if (!data.title) return false
 
-        const errorTitles = [
-            'oops', 'no se encontró', 'no se encontro', '404', 'error',
-            'página no encontrada', 'pagina no encontrada', 'sin resultados',
-            'búsqueda', 'busqueda', 'resultados de', 'resultados.aspx'
-        ]
-
-        const lowerTitle = data.title.toLowerCase()
-        if (errorTitles.some(et => lowerTitle.includes(et))) return false
+        if (this.isErrorTitle(data.title)) return false
 
         // A valid book from a bookstore search should ideally have an author or ISBN or cover
         // or a title that doesn't look like a generic search page
@@ -218,23 +233,36 @@ export class ScraperService {
         const data: ScrapedData = {}
         const domain = new URL(url).origin
 
-        // Title
+        // 1. Try Product Page Title
         const titleMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
         if (titleMatch) data.title = this.clean(titleMatch[1])
 
+        // 2. Try Results List Title (Cuspide/SBS/Galerna)
+        if (!data.title || this.isErrorTitle(data.title)) {
+            const listMatch = html.match(/<a[^>]*class="nombre"[^>]*>([\s\S]*?)<\/a>/i) ||
+                            html.match(/<div[^>]*class="nombre"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i) ||
+                            html.match(/<h2[^>]*class="title"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i)
+            if (listMatch) data.title = this.clean(listMatch[1])
+        }
+
         // Authors
         const authorMatch = html.match(/<a[^>]*itemprop="author"[^>]*>([\s\S]*?)<\/a>/i) ||
-            html.match(/Autor:[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i)
+            html.match(/Autor:[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i) ||
+            html.match(/<div[^>]*class="autor"[^>]*>([\s\S]*?)<\/div>/i)
         if (authorMatch) data.authors = [this.clean(authorMatch[1])]
 
         // Description
         const descMatch = html.match(/<div[^>]*class="resumen"[^>]*>([\s\S]*?)<\/div>/i) ||
-            html.match(/<div[^>]*id="info"[^>]*>([\s\S]*?)<\/div>/i)
+            html.match(/<div[^>]*id="info"[^>]*>([\s\S]*?)<\/div>/i) ||
+            html.match(/<div[^>]*class="description"[^>]*>([\s\S]*?)<\/div>/i)
         if (descMatch) data.description = this.clean(descMatch[1])
 
         // Cover
         const coverMatch = html.match(/<img[^>]*id="imgProducto"[^>]*src="([\s\S]*?)"/i) ||
-            html.match(/<img[^>]*class="foto"[^>]*src="([\s\S]*?)"/i)
+            html.match(/<img[^>]*class="foto"[^>]*src="([\s\S]*?)"/i) ||
+            html.match(/<img[^>]*class="cover"[^>]*src="([\s\S]*?)"/i) ||
+            html.match(/<img[^>]*id="ctl00_CPH1_rptResultados_ctl00_imgTapa"[^>]*src="([\s\S]*?)"/i)
+
         if (coverMatch) {
             const src = coverMatch[1]
             data.coverPath = src.startsWith('http') ? src : `${domain}${src}`
@@ -284,19 +312,25 @@ export class ScraperService {
     private parseBuscalibre(html: string): ScrapedData {
         const data: ScrapedData = {}
         const titleMatch = html.match(/<h1[^>]*itemprop="name"[^>]*>([\s\S]*?)<\/h1>/i) ||
-            html.match(/<h3[^>]*class="nombre"[^>]*>([\s\S]*?)<\/h3>/i)
+            html.match(/<h3[^>]*class="nombre"[^>]*>([\s\S]*?)<\/h3>/i) ||
+            html.match(/<div[^>]*class="nombre"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i)
+            
         if (titleMatch) {
-            let title = this.clean(titleMatch[1])
-            // Remove SEO junk: "Libro [Title] De [Author] - Buscalibre Argentina"
-            title = title.replace(/^Libro\s+(.*?)\s+De\s+.*?\s*-\s*Buscalibre.*$/i, '$1').trim()
-            data.title = title
+            data.title = this.clean(titleMatch[1])
         }
 
         const authorMatch = html.match(/<div[^>]*class="autor"[^>]*>([\s\S]*?)<\/div>/i) ||
-            html.match(/itemprop="author"[\s\S]*?>([\s\S]*?)<\/a>/i)
+            html.match(/itemprop="author"[\s\S]*?>([\s\S]*?)<\/a>/i) ||
+            html.match(/<div[^>]*class="author"[^>]*>([\s\S]*?)<\/div>/i)
         if (authorMatch) data.authors = [this.clean(authorMatch[1])]
 
-        const descMatch = html.match(/<div[^>]*id="descripcion"[^>]*>([\s\S]*?)<\/div>/i)
+        // Clean title using authors if available
+        if (data.title) {
+            data.title = this.cleanTitle(data.title, data.authors)
+        }
+
+        const descMatch = html.match(/<div[^>]*id="descripcion"[^>]*>([\s\S]*?)<\/div>/i) ||
+            html.match(/<div[^>]*class="sinopsis"[^>]*>([\s\S]*?)<\/div>/i)
         if (descMatch) {
             let desc = this.clean(descMatch[1])
             // Remove Buscalibre SEO suffix from descriptions
@@ -306,11 +340,13 @@ export class ScraperService {
         }
 
         const coverMatch = html.match(/<img[^>]*id="primaryimage"[^>]*src="([\s\S]*?)"/i) ||
-            html.match(/<img[^>]*class="box-foto"[^>]*src="([\s\S]*?)"/i)
+            html.match(/<img[^>]*class="box-foto"[^>]*src="([\s\S]*?)"/i) ||
+            html.match(/<img[^>]*class="imagen-tapa"[^>]*src="([\s\S]*?)"/i)
         if (coverMatch) data.coverPath = coverMatch[1]
 
         const pubMatch = html.match(/Editorial:[\s\S]*?>([\s\S]*?)<\/a>/i) ||
-            html.match(/data-editorial="([^"]+)"/i)
+            html.match(/data-editorial="([^"]+)"/i) ||
+            html.match(/Editorial:[\s\S]*?<span>([\s\S]*?)<\/span>/i)
         if (pubMatch) data.publisher = this.clean(pubMatch[1])
 
         return data
@@ -418,6 +454,70 @@ export class ScraperService {
         return data
     }
 
+    private parseMercadoLibre(html: string, url: string): ScrapedData {
+        const data: ScrapedData = {}
+        
+        // ML can return a list or a product page
+        // 1. Product Page (Catalogo)
+        const titleMatch = html.match(/<h1[^>]*class="[^"]*ui-pdp-title[^"]*"[^>]*>([\s\S]*?)<\/h1>/i)
+        if (titleMatch) {
+            data.title = this.clean(titleMatch[1])
+            
+            // Description
+            const descMatch = html.match(/<p[^>]*class="[^"]*ui-pdp-description__content[^"]*"[^>]*>([\s\S]*?)<\/p>/i)
+            if (descMatch) data.description = this.clean(descMatch[1])
+            
+            // Cover
+            const coverMatch = html.match(/<img[^>]*class="[^"]*ui-pdp-image[^"]*"[^>]*src="([^"]+)"/i) ||
+                               html.match(/<img[^>]*class="[^"]*ui-pdp-gallery__figure__image[^"]*"[^>]*src="([^"]+)"/i)
+            if (coverMatch) data.coverPath = coverMatch[1]
+            
+            // Metadata
+            const tableMatch = html.match(/<table[^>]*class="[^"]*ui-vpp-striped-specs__table[^"]*"[\s\S]*?<\/table>/i) ||
+                               html.match(/<table[^>]*class="[^"]*ui-pdp-specs__table[^"]*"[\s\S]*?<\/table>/i)
+            if (tableMatch) {
+                const pubMatch = tableMatch[0]?.match(/Editorial<\/th>[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/i)
+                if (pubMatch) data.publisher = this.clean(pubMatch[1])
+                const authorMatch = tableMatch[0]?.match(/Autor<\/th>[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/i)
+                if (authorMatch) data.authors = [this.clean(authorMatch[1])]
+            }
+        } else {
+            // 2. List Page - Use more generic class patterns
+            const firstItemMatch = html.match(/<h2[^>]*class="[^"]*ui-search-item__title[^"]*"[^>]*>([\s\S]*?)<\/h2>/i) ||
+                                  html.match(/<h2[^>]*class="[^"]*poly-box[^"]*poly-component__title[^"]*"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i) ||
+                                  html.match(/<h3[^>]*class="[^"]*ui-search-item__title[^"]*"[^>]*>([\s\S]*?)<\/h3>/i)
+            if (firstItemMatch) {
+                data.title = this.clean(firstItemMatch[1])
+                
+                const firstImageMatch = html.match(/<img[^>]*class="[^"]*ui-search-result-image__element[^"]*"[^>]*src="([^"]+)"/i) ||
+                                     html.match(/<img[^>]*class="[^"]*poly-component__image[^"]*"[^>]*src="([^"]+)"/i) ||
+                                     html.match(/<img[^>]*class="[^"]*ui-search-item__image[^"]*"[^>]*src="([^"]+)"/i)
+                if (firstImageMatch) data.coverPath = firstImageMatch[1]
+            }
+        }
+
+        return data
+    }
+
+    private isErrorTitle(title: string): boolean {
+        const lowerTitle = title.toLowerCase().trim()
+        
+        const errorKeywords = [
+            'oops', '404', 'no se encontró', 'no se encontro', 'sin resultados',
+            'página no encontrada', 'pagina no encontrada', 'error de página',
+            'resultados.aspx', 'busqueda.aspx', 'no se encontraron resultados',
+            'acceso denegado', 'access denied', 'página solicitada no existe'
+        ]
+        
+        if (errorKeywords.some(kw => lowerTitle.includes(kw))) return true
+        
+        // Exact matches for single words that are usually placeholders
+        const exactErrors = ['error', 'oops', 'búsqueda', 'busqueda', 'resultados']
+        if (exactErrors.includes(lowerTitle)) return true
+
+        return false
+    }
+
     private parseGeneric(html: string): ScrapedData {
         const data: ScrapedData = {}
 
@@ -464,6 +564,37 @@ export class ScraperService {
 
         for (const pattern of seoSpamPatterns) {
             cleaned = cleaned.replace(pattern, '')
+        }
+
+        return cleaned.trim()
+    }
+    private cleanTitle(title: string, authors: string[] = []): string {
+        let cleaned = title
+        
+        // Remove "Libro " prefix
+        cleaned = cleaned.replace(/^Libro\s+/i, '')
+        
+        // If it contains "Buscalibre", we know it's one of those SEO titles
+        if (cleaned.toLowerCase().includes('buscalibre')) {
+            // Try to find the last " de " before the author or before " - Buscalibre"
+            // Use greedy match to handle "de" inside titles
+            cleaned = cleaned.replace(/^(.*)\s+de\s+.*?\s*-\s*Buscalibre.*$/i, '$1')
+        }
+
+        // If we have authors, try to remove trailing " de [Author]"
+        if (authors.length > 0) {
+            for (const author of authors) {
+                if (!author) continue
+                const escapedAuthor = author.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                const pattern = new RegExp(`\\s+de\\s+${escapedAuthor}$`, 'i')
+                cleaned = cleaned.replace(pattern, '')
+            }
+        }
+        
+        // Final sanity check for remaining " de " at the end if it's very long
+        // (Buscalibre titles often look like "Libro Título de Autor")
+        if (title.toLowerCase().startsWith('libro ')) {
+            cleaned = cleaned.replace(/^(.*)\s+de\s+.*?$/i, '$1')
         }
 
         return cleaned.trim()

@@ -1,6 +1,7 @@
 import axios from 'axios'
 import https from 'https'
 import { ScraperService } from './scraperService'
+import { MetadataCache } from './metadataCache'
 
 export interface BookMetadata {
     title: string
@@ -9,11 +10,12 @@ export interface BookMetadata {
     pageCount?: number
     description?: string
     coverUrl?: string
-    isbn?: string // Added for internal use in refactored logic
+    isbn?: string
 }
 
 export class MetadataService {
     private scraperService: ScraperService | null = null
+    private cache = new MetadataCache()
 
     setScraperService(scraper: ScraperService) {
         this.scraperService = scraper
@@ -23,101 +25,233 @@ export class MetadataService {
         const cleanIsbn = this.normalizeIsbn(isbn)
         const searchIsbn = cleanIsbn.toUpperCase()
 
-        let book: BookMetadata | null = null
+        // 1. Check Cache first
+        const cached = this.cache.get(searchIsbn)
+        if (cached) return cached
 
-        // If it looks like a real ISBN, try searching by it
-        if (searchIsbn.length >= 10 && searchIsbn.length <= 13 && /^[0-9X]+$/.test(searchIsbn)) {
-            // 1. Try Bookstore Scrapers FIRST (Prioritizing local results and avoiding Google 429)
-            if (this.scraperService) {
-                console.log(`[MetadataService] Attempting Bookstore search FIRST for ISBN: ${searchIsbn}`)
+        // If it's not a real ISBN-like string, we only do title search
+        const isRealIsbn = searchIsbn.length >= 10 && searchIsbn.length <= 13 && /^[0-9X]+$/.test(searchIsbn)
+
+        if (!isRealIsbn) {
+            if (title) {
+                const titleResult = await this.fetchGoogleByTitle(title, author || '')
+                return titleResult as BookMetadata
+            }
+            return null
+        }
+
+        console.log(`[MetadataService] Overhauling lookup for ISBN: ${searchIsbn}`)
+        let results: (BookMetadata | Partial<BookMetadata> | null)[] = []
+
+        // --- Tiered Parallel Search ---
+
+        // Tier 1: Fast & Reliable
+        console.log('[MetadataService] Tier 1: Google + OpenLibrary')
+        const tier1 = await Promise.allSettled([
+            this.fetchGoogleBooks(searchIsbn, true),
+            this.fetchOpenLibrary(searchIsbn)
+        ])
+        results.push(...tier1.map(r => r.status === 'fulfilled' ? (r as PromiseFulfilledResult<any>).value : null))
+
+        // Check if Tier 1 is "good enough" (has title, author, and Spanish description)
+        const bestTier1 = results.find(r => r && r.title && r.description && !this.isEnglish(r.description))
+        if (bestTier1 && bestTier1.coverUrl) {
+            const finalBook = { isbn: searchIsbn, ...bestTier1 } as BookMetadata
+            this.cache.set(searchIsbn, finalBook)
+            return finalBook
+        }
+
+        // Tier 2: Bookstore Scrapers (Regional focus)
+        console.log('[MetadataService] Tier 2: Bookstore Scrapers')
+        if (this.scraperService) {
+            try {
                 const scraped = await this.scraperService.findByIsbn(searchIsbn)
                 if (scraped) {
-                    book = {
-                        title: scraped.title!,
-                        authors: scraped.authors || [],
+                    results.push({
+                        title: scraped.title,
+                        authors: scraped.authors,
                         publisher: scraped.publisher,
-                        pageCount: scraped.pageCount,
                         description: scraped.description,
                         coverUrl: scraped.coverPath,
-                        isbn: searchIsbn
+                        pageCount: scraped.pageCount
+                    })
+                }
+            } catch (e) {
+                console.warn('[MetadataService] Tier 2 error:', e)
+            }
+        }
+
+        // Tier 3: BNE & Inventaire (Slow/Deep)
+        console.log('[MetadataService] Tier 3: BNE + Inventaire')
+        const tier3 = await Promise.allSettled([
+            this.fetchBNE(searchIsbn),
+            this.fetchInventaire(searchIsbn)
+        ])
+        results.push(...tier3.map(r => r.status === 'fulfilled' ? (r as PromiseFulfilledResult<any>).value : null))
+
+        // --- Merge Results ---
+        const merged = this.mergeResults(results as BookMetadata[], searchIsbn)
+
+        if (merged) {
+            // Final fallback: if merged has no description or is English, try title search as last resort
+            if (!merged.description || this.isEnglish(merged.description)) {
+                const searchTitle = merged.title || title || ''
+                const searchAuthor = author || (merged.authors ? merged.authors[0] : '')
+                
+                if (searchTitle) {
+                    // Try Google Books first
+                    try {
+                        const titleSearch = await this.fetchGoogleByTitle(searchTitle, searchAuthor)
+                        if (titleSearch) {
+                            merged.description = merged.description || titleSearch.description
+                            merged.coverUrl = merged.coverUrl || titleSearch.coverUrl
+                        }
+                    } catch (e) {
+                        console.warn('[MetadataService] Google Title search failed, trying OpenLibrary...')
+                        const olTitleSearch = await this.fetchOpenLibraryByTitle(searchTitle, searchAuthor)
+                        if (olTitleSearch) {
+                            merged.description = merged.description || olTitleSearch.description
+                            merged.coverUrl = merged.coverUrl || olTitleSearch.coverUrl
+                        }
                     }
                 }
             }
 
-            // 2. Try BNE (Biblioteca Nacional de España)
-            if (!book) {
-                book = await this.fetchBNE(searchIsbn)
+            const finalMerged = this.finalizeMetadata(merged)
+            if (finalMerged && finalMerged.title && this.isErrorTitle(finalMerged.title)) {
+                console.warn(`[MetadataService] Rejecting error title after merge: ${finalMerged.title}`)
+                return null
             }
 
-            // 3. Try Google Books (Spanish preference) as fallback
-            if (!book) {
-                try {
-                    book = await this.fetchGoogleBooks(searchIsbn, true)
-                } catch (e: any) {
-                    if (e.message === 'GOOGLE_429') {
-                        console.warn('[MetadataService] Google API 429 Timeout hit. Skipping Google Books entirely.')
-                    }
+            this.cache.set(searchIsbn, finalMerged)
+            return finalMerged
+        }
+
+        return null
+    }
+
+    private isErrorTitle(title: string): boolean {
+        const lowerTitle = title.toLowerCase().trim()
+        const errorKeywords = ['oops', '404', 'no se encontró', 'no se encontro', 'sin resultados', 'página no encontrada']
+        return errorKeywords.some(kw => lowerTitle.includes(kw))
+    }
+
+    private finalizeMetadata(metadata: BookMetadata): BookMetadata {
+        if (!metadata.title) return metadata
+        
+        let title = metadata.title.trim()
+        
+        // Remove "Libro " prefix
+        title = title.replace(/^Libro\s+/i, '')
+        
+        // Remove trailing " de [Author]"
+        if (metadata.authors && metadata.authors.length > 0) {
+            for (const author of metadata.authors) {
+                if (!author) continue
+                const escapedAuthor = author.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                // Case insensitive match at the end
+                const pattern = new RegExp(`\\s+de\\s+${escapedAuthor}$`, 'i')
+                title = title.replace(pattern, '')
+            }
+        }
+        
+        // Greedy fallback for " de [Any Author Name]" if it starts with Libro
+        // But only if we are confident it's an SEO title
+        if (metadata.title.toLowerCase().startsWith('libro ') && title.toLowerCase().includes(' de ')) {
+            title = title.replace(/^(.*)\s+de\s+.*?$/i, '$1')
+        }
+
+        // Clean common SEO suffixes
+        title = title.replace(/\s*[|\-]\s*Buscalibre.*$/i, '')
+        title = title.replace(/\s*[|\-]\s*Cúspide.*$/i, '')
+        title = title.replace(/\s*[|\-]\s*Tematika.*$/i, '')
+        
+        metadata.title = title.trim()
+        return metadata
+    }
+
+    private async fetchOpenLibraryByTitle(title: string, author: string): Promise<Partial<BookMetadata> | null> {
+        try {
+            const query = `title=${encodeURIComponent(title)}${author ? `&author=${encodeURIComponent(author)}` : ''}`
+            const url = `https://openlibrary.org/search.json?${query}&limit=3`
+            const response = await axios.get(url, { timeout: 10000 })
+            
+            if (response.data.docs && response.data.docs.length > 0) {
+                const best = response.data.docs[0]
+                // Search result list in OL doesn't have description, need to fetch detail if available
+                if (best.isbn && best.isbn.length > 0) {
+                    return await this.fetchOpenLibrary(best.isbn[0])
+                }
+                return {
+                    title: best.title,
+                    authors: best.author_name || [],
+                    publisher: best.publisher ? best.publisher[0] : undefined,
+                    coverUrl: best.cover_i ? `https://covers.openlibrary.org/b/id/${best.cover_i}-L.jpg` : undefined
                 }
             }
+        } catch (e) {
+            console.warn('[MetadataService] OpenLibrary Title Search failed:', e)
         }
+        return null
+    }
 
-        // 4. Fallback to Title/Author search if no book yet OR if the current book is poor/English
-        const isPoorMetadata = (b: BookMetadata) => !b.description || !b.coverUrl || this.isEnglish(b.description)
+    private mergeResults(results: BookMetadata[], isbn: string): BookMetadata | null {
+        const valid = results.filter(r => r && r.title)
+        if (valid.length === 0) return null
 
-        if (!book && title) {
-            const titleSearch = await this.fetchGoogleByTitle(title, author || '')
-            if (titleSearch) {
-                book = titleSearch as BookMetadata
-            }
-        } else if (book && title && isPoorMetadata(book)) {
-            const titleSearch = await this.fetchGoogleByTitle(title ?? book.title, author ?? book.authors[0])
-            if (titleSearch) {
-                // Keep the original clean ISBN but prioritize better metadata from title search
-                book = { ...book, ...titleSearch }
-            }
-        }
+        // 1. Pick the best title (prefer longer ones usually, but avoiding SEO spam)
+        const titles = valid.map(r => r.title).sort((a, b) => b.length - a.length)
+        const bestTitle = titles[0]
 
-        // 5. Try to improve with Inventaire (only if we have a plausible ISBN)
-        if (searchIsbn.length >= 10 && (!book || isPoorMetadata(book))) {
-            const invBook = await this.fetchInventaire(searchIsbn)
-            if (invBook) {
-                if (!book) book = { isbn: cleanIsbn, ...invBook } as any
-                else {
-                    book.description = book.description || invBook.description
-                    book.coverUrl = book.coverUrl || invBook.coverUrl
-                }
-            }
-        }
+        // 2. Pick the best authors
+        const authorsSet = new Set<string>()
+        valid.forEach(r => r.authors?.forEach(a => authorsSet.add(a)))
+        const bestAuthors = Array.from(authorsSet)
 
-        // 6. Try OpenLibrary as a last resort
-        if (searchIsbn.length >= 10 && (!book || isPoorMetadata(book))) {
-            const olBook = await this.fetchOpenLibrary(searchIsbn)
-            if (olBook) {
-                if (!book) book = olBook
-                else {
-                    book.description = book.description || olBook.description
-                    book.coverUrl = book.coverUrl || olBook.coverUrl
-                }
+        // 3. Pick the best publisher (Prefer those from Argentina/Spain if detected)
+        const publishers = valid.map(r => r.publisher).filter(Boolean)
+        const argEsPublishers = ['planeta', 'sudamericana', 'alfaguara', 'debolsillo', 'galerna', 'nordica', 'siglo veintiuno', 'emece', 'tusquets']
+        let bestPublisher = publishers[0]
+        for (const p of publishers) {
+            if (argEsPublishers.some(keyword => p!.toLowerCase().includes(keyword))) {
+                bestPublisher = p
+                break
             }
         }
 
-        if (book) {
-            // Ensure the ISBN we return is the normalized one (or original if not found better)
-            book.isbn = book.isbn || cleanIsbn
+        // 4. Pick the best description (Prefer Spanish and longest)
+        const descriptions = valid.map(r => r.description).filter(Boolean) as string[]
+        const spanishDescs = descriptions.filter(d => !this.isEnglish(d))
+        const bestDescription = spanishDescs.sort((a, b) => b.length - a.length)[0] || descriptions.sort((a, b) => b.length - a.length)[0]
+
+        // 5. Pick the best coverUrl
+        // Prioritize bookstore covers over Google/OpenLibrary as they are usually better quality for local books
+        const covers = valid.map(r => r.coverUrl).filter(Boolean) as string[]
+        const bestCover = covers.find(c => c.includes('cuspide') || c.includes('buscalibre') || c.includes('mercadolibre') || c.includes('casadellibro')) 
+                       || covers.find(c => c.includes('openlibrary'))
+                       || covers[0]
+
+        // 6. Max page count
+        const pageCount = Math.max(...valid.map(r => r.pageCount || 0))
+
+        return {
+            isbn,
+            title: bestTitle,
+            authors: bestAuthors.length > 0 ? bestAuthors : [],
+            publisher: bestPublisher,
+            description: bestDescription,
+            coverUrl: bestCover,
+            pageCount: pageCount > 0 ? pageCount : undefined
         }
-        return book
     }
 
     private normalizeIsbn(isbn: string): string {
-        // Strip prefixes like WISH- or OL- to allow searching the real ISBN if contained
         let clean = isbn.replace(/^(WISH-|OL-)/i, '')
-        // Normalize for search: keep only digits and X
         return clean.replace(/[^0-9X]/gi, '').toUpperCase()
     }
 
     private async fetchBNE(isbn: string): Promise<BookMetadata | null> {
         try {
-            // Using a search query on datos.bne.es instead of direct resource URI for better reliability
             const url = `https://datos.bne.es/search?q=${isbn}`
             const response = await axios.get(url, {
                 headers: {
@@ -125,12 +259,10 @@ export class MetadataService {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                 },
                 httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-                timeout: 20000 // Increased timeout to 20s for BNE as it is very slow
+                timeout: 10000 
             })
             const html = response.data
 
-            // Simple regex extraction for BNE portal
-            // Title often inside <h2 class="title"> or <h1 class="item-title">
             const titleMatch = html.match(/<title>([\s\S]*?)<\/title>/i) || html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
             const schemaTitle = html.match(/"name":\s*"([^"]+)"/) || html.match(/itemprop="name"[^>]*>([\s\S]*?)<\/span>/i)
             const schemaAuthor = html.match(/"author":\s*\[\s*{\s*"name":\s*"([^"]+)"/) || html.match(/schema:author[^>]*>([\s\S]*?)<\/a>/i) || html.match(/itemprop="author"[^>]*>([\s\S]*?)<\/span>/i)
@@ -140,7 +272,6 @@ export class MetadataService {
                 let title = (schemaTitle ? schemaTitle[1] : titleMatch![1].split('|')[0]).trim()
                 title = title.replace(/<[^>]*>/g, '').trim()
 
-                // Avoid matching the ISBN itself as a title
                 if (title.includes(isbn) && title.length < isbn.length + 5) return null
 
                 return {
@@ -160,18 +291,16 @@ export class MetadataService {
         if (!text) return false
         const enWords = [' the ', ' is ', ' of ', ' and ', ' with ', ' for ', ' was ', ' but ']
         const matches = enWords.filter(w => text.toLowerCase().includes(w)).length
-        return matches >= 2 // Simple heuristic
+        return matches >= 2
     }
 
     private async fetchGoogleBooks(isbn: string, esOnly: boolean): Promise<BookMetadata | null> {
         try {
             const langParam = esOnly ? '&langRestrict=es' : ''
-            // Try with isbn: prefix first
             let url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}${langParam}`
             let response = await axios.get(url, { timeout: 10000 })
 
             if (response.data.totalItems === 0) {
-                // Try without isbn: prefix as a fallback
                 url = `https://www.googleapis.com/books/v1/volumes?q=${isbn}${langParam}`
                 response = await axios.get(url, { timeout: 10000 })
             }
@@ -183,20 +312,18 @@ export class MetadataService {
             if (error.response && error.response.status === 429) {
                 throw new Error('GOOGLE_429')
             }
-            console.warn(`Google Books (ISBN=${isbn}, esOnly=${esOnly}) failed:`, error.message)
+            console.warn(`Google Books (ISBN=${isbn}) failed:`, error.message)
         }
         return null
     }
 
     private async fetchGoogleByTitle(title: string, author: string): Promise<Partial<BookMetadata> | null> {
         try {
-            // Search by title and author, forcing Spanish results
             const query = `intitle:${encodeURIComponent(title)}${author ? `+inauthor:${encodeURIComponent(author)}` : ''}`
             const url = `https://www.googleapis.com/books/v1/volumes?q=${query}&langRestrict=es&maxResults=3`
             const response = await axios.get(url)
 
             if (response.data.totalItems > 0 && response.data.items?.length > 0) {
-                // Find the first one with a description
                 const items = response.data.items
                 const best = items.find((i: any) => i.volumeInfo.description) || items[0]
                 return this.mapGoogleBook(best.volumeInfo)
@@ -221,12 +348,10 @@ export class MetadataService {
 
     private async fetchInventaire(isbn: string): Promise<Partial<BookMetadata> | null> {
         try {
-            // Inventaire.io ISBN lookup - using 'isbn' parameter instead of 'value'
             const url = `https://inventaire.io/api/data?action=isbn&isbn=${isbn}`
             const response = await axios.get(url, { timeout: 5000 })
 
             if (response.data && response.data.entities) {
-                // Find the primary book entity (often starts with 'wd:' or 'inv:')
                 const entities = response.data.entities
                 const firstKey = Object.keys(entities)[0]
                 const info = entities[firstKey]
@@ -234,13 +359,8 @@ export class MetadataService {
                 if (info) {
                     const labels = info.labels || {}
                     const descriptions = info.descriptions || {}
-
-                    // Prefer Spanish label/description
                     const title = labels.es || labels.en || Object.values(labels)[0] || 'Sin Título'
                     const description = descriptions.es || descriptions.en || Object.values(descriptions)[0] || ''
-
-                    // Simple mapping of claims (authors, etc) - Inventaire uses Wikidata-like props
-                    // P50 is usually author. This gets complex, but for basic info:
 
                     return {
                         title: typeof title === 'string' ? title : title.value,
