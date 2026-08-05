@@ -1,23 +1,11 @@
 import React, { useState } from 'react'
 import { LayoutList, Grid2X2, Square } from 'lucide-react'
 
-interface Props {
+interface SearchProps {
     onSearch: (query: string) => void
-    thumbnailSize: 'S' | 'M' | 'L' | 'XL'
-    setThumbnailSize: (size: 'S' | 'M' | 'L' | 'XL') => void
-    isMobile?: boolean
-    mobileLayout?: 'list' | 'grid' | 'full'
-    onSetMobileLayout?: (mode: 'list' | 'grid' | 'full') => void
 }
 
-export const SearchBar: React.FC<Props> = ({
-    onSearch,
-    thumbnailSize,
-    setThumbnailSize,
-    isMobile = false,
-    mobileLayout = 'grid',
-    onSetMobileLayout
-}) => {
+export const SearchBar: React.FC<SearchProps> = ({ onSearch }) => {
     const [query, setQuery] = useState('')
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,7 +23,27 @@ export const SearchBar: React.FC<Props> = ({
                 onChange={handleChange}
                 className="search-input"
             />
+        </div>
+    )
+}
 
+interface SizeProps {
+    thumbnailSize: 'S' | 'M' | 'L' | 'XL'
+    setThumbnailSize: (size: 'S' | 'M' | 'L' | 'XL') => void
+    isMobile?: boolean
+    mobileLayout?: 'list' | 'grid' | 'full'
+    onSetMobileLayout?: (mode: 'list' | 'grid' | 'full') => void
+}
+
+export const SizeSelector: React.FC<SizeProps> = ({
+    thumbnailSize,
+    setThumbnailSize,
+    isMobile = false,
+    mobileLayout = 'grid',
+    onSetMobileLayout
+}) => {
+    return (
+        <div className="size-selector-container">
             {isMobile ? (
                 <div className="size-selector-pills mobile">
                     <button

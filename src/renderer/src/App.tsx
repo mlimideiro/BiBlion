@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { BookListItem } from './components/BookListItem'
-import { SearchBar } from './components/SearchBar'
+import { SearchBar, SizeSelector } from './components/SearchBar'
 import { LayoutGrid, Settings, User, HandHelping, X, Download, Gift, Trash2, RefreshCw, Tag, LogOut, BookPlus } from 'lucide-react'
 import { SettingsModal } from './components/SettingsModal'
 import { dataService } from './services/dataService'
@@ -654,6 +654,10 @@ function App() {
                         </button>
                     </div>
 
+                    <div className="header-search-container">
+                        <SearchBar onSearch={handleSearch} />
+                    </div>
+
                     <div className="controls-group right">
                         <button
                             className="select-mode-btn"
@@ -667,7 +671,7 @@ function App() {
 
                         <div className="server-info">
                             <span style={{ marginRight: 8 }}>📲</span>
-                            Escanea desde: <a href={mobileUrl} target="_blank" className="mobile-link">{mobileUrl}</a>
+                            <a href={mobileUrl} target="_blank" className="mobile-link">Escaneá desde aquí</a>
                         </div>
 
                         <div className="settings-container" ref={menuRef}>
@@ -733,11 +737,12 @@ function App() {
             </header>
 
             <div className="main-content">
-                <SearchBar
-                    onSearch={handleSearch}
-                    thumbnailSize={thumbnailSize}
-                    setThumbnailSize={setThumbnailSize}
-                />
+                <div className="view-controls">
+                    <SizeSelector
+                        thumbnailSize={thumbnailSize}
+                        setThumbnailSize={setThumbnailSize}
+                    />
+                </div>
 
                 {config && config.tags.length > 0 && (
                     <div className="tags-carousel-wrapper">

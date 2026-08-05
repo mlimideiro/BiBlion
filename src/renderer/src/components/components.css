@@ -241,7 +241,7 @@ body {
 }
 
 /* Search Bar & Size Selector Group */
-.search-bar {
+.search-bar, .library-search-container {
     width: 100%;
     max-width: 1100px;
     margin: 20px auto 10px;
@@ -278,6 +278,33 @@ body {
 .search-input::placeholder {
     color: var(--text-secondary);
     opacity: 0.6;
+}
+
+/* Header Search Context */
+.header-search-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    margin: 0 15px;
+}
+
+.header-search-container .search-bar {
+    width: 100%;
+    max-width: 450px;
+    margin: 0;
+}
+
+.header-search-container .search-input {
+    padding: 8px 20px;
+    font-size: 0.95rem;
+}
+
+/* View Controls (Size Selector) */
+.view-controls {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+    margin-bottom: 20px;
 }
 
 .size-selector-pills {

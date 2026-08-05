@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Book, Config } from '../types'
 import { BookListItem } from './BookListItem'
-import { SearchBar } from './SearchBar'
+import { SearchBar, SizeSelector } from './SearchBar'
 import { dataService } from '../services/dataService'
 import { X, Sparkles, Trash2, ChevronRight, HandHelping } from 'lucide-react'
 
@@ -171,14 +171,16 @@ export const LibraryView: React.FC<Props> = ({
                     </div>
                 </div>
             )}
-            <SearchBar
-                onSearch={handleSearch}
-                thumbnailSize={thumbnailSize}
-                setThumbnailSize={handleSaveThumbnailSize}
-                isMobile={isMobile}
-                mobileLayout={mobileLayout}
-                onSetMobileLayout={handleSetMobileLayout}
-            />
+            <div className="library-search-container">
+                <SearchBar onSearch={handleSearch} />
+                <SizeSelector
+                    thumbnailSize={thumbnailSize}
+                    setThumbnailSize={handleSaveThumbnailSize}
+                    isMobile={isMobile}
+                    mobileLayout={mobileLayout}
+                    onSetMobileLayout={handleSetMobileLayout}
+                />
+            </div>
 
             {config && config.tags.length > 0 && (
                 <div className="tags-carousel-wrapper">
