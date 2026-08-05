@@ -189,14 +189,18 @@ export class AdminUtils {
         responseType: 'arraybuffer',
         timeout: 10000,
         headers: {
-          'User-Agent': 'Mozilla/5.0'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Referer': 'https://www.buscalibre.com/',
+          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8'
         }
       })
       fsExtra.ensureDirSync(path.dirname(dest))
       fs.writeFileSync(dest, Buffer.from(response.data))
       return true
-    } catch (e) {
-      return false
+    } catch (e: any) {
+      throw new Error(e.message || 'Error desconocido al descargar')
     }
   }
 }
