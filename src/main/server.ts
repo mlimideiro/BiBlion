@@ -226,6 +226,12 @@ export function startServer(
             await adminUtils.syncAllUserCovers((msg) => {
                 res.write(msg + '\n')
             })
+            try {
+                const users = fs.readdirSync(path.join(process.cwd(), 'db_biblion', 'users')).filter(f => fs.statSync(path.join(process.cwd(), 'db_biblion', 'users', f)).isDirectory())
+                users.forEach(u => onBookUpdate(u, {} as Book))
+            } catch (e) {
+                console.error('Error broadcasting update after sync:', e)
+            }
             res.end()
         } catch (error: any) {
             console.error('[Admin] Global error during sync:', error)
@@ -280,6 +286,7 @@ export function startServer(
                 books[idx].coverPath = `local:${username}:${localFilename}`
                 dataManager.saveBooks(username, [books[idx]])
                 console.log(`[Cover] Sync: Record updated for existing file ${cleanIsbn}`)
+                onBookUpdate(username, books[idx])
             }
             return
         }
@@ -305,6 +312,7 @@ export function startServer(
                 currentBooks[currentIdx].coverPath = `local:${username}:${localFilename}`
                 dataManager.saveBooks(username, [currentBooks[currentIdx]])
                 console.log(`[Cover] Downloaded and cached: ${username}/${cleanIsbn}`)
+                onBookUpdate(username, currentBooks[currentIdx])
             }
         } catch (e) {
             console.warn(`[Cover] Download failed for ${isbn} (${coverUrl}): ${(e as Error).message}`)

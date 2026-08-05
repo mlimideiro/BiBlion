@@ -63,6 +63,7 @@ app.whenReady().then(() => {
                 const userDir = path.join(process.cwd(), 'db_biblion', 'users', username)
                 const booksFile = path.join(userDir, 'books.json')
                 fsExtra.writeJsonSync(booksFile, books, { spaces: 2 })
+                mainWindow?.webContents.send('books-updated', { username, books: dataManager.getAllBooks(username) })
             }
             return
         }
@@ -86,6 +87,7 @@ app.whenReady().then(() => {
                     const booksFile = path.join(userDir, 'books.json')
                     fsExtra.writeJsonSync(booksFile, books, { spaces: 2 })
                     console.log(`[Cover IPC] Cached locally for ${username}/${cleanIsbn}`)
+                    mainWindow?.webContents.send('books-updated', { username, books: dataManager.getAllBooks(username) })
                 }
             })
             .catch(e => console.warn(`[Cover IPC] Download failed for ${isbn}:`, e.message))
