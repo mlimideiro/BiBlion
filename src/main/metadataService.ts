@@ -162,7 +162,6 @@ export class MetadataService {
         }
 
         // Clean common SEO suffixes
-        title = title.replace(/\s*[|\-]\s*Buscalibre.*$/i, '')
         title = title.replace(/\s*[|\-]\s*Cúspide.*$/i, '')
         title = title.replace(/\s*[|\-]\s*Tematika.*$/i, '')
         
@@ -227,7 +226,7 @@ export class MetadataService {
         // 5. Pick the best coverUrl
         // Prioritize bookstore covers over Google/OpenLibrary as they are usually better quality for local books
         const covers = valid.map(r => r.coverUrl).filter(Boolean) as string[]
-        const bestCover = covers.find(c => c.includes('cuspide') || c.includes('buscalibre') || c.includes('mercadolibre') || c.includes('casadellibro')) 
+        const bestCover = covers.find(c => c.includes('cuspide') || c.includes('mercadolibre') || c.includes('casadellibro')) 
                        || covers.find(c => c.includes('openlibrary'))
                        || covers[0]
 

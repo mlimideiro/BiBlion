@@ -29,8 +29,6 @@ export class ScraperService {
                 data = this.parseStandardASPX(html, finalUrl)
             } else if (finalUrl.includes('sbs.com.ar')) {
                 data = this.parseSBS(html)
-            } else if (finalUrl.includes('buscalibre')) {
-                data = this.parseBuscalibre(html)
             } else if (finalUrl.includes('tematika.com')) {
                 data = this.parseTematika(html)
             } else if (finalUrl.includes('nordicalibros.com')) {
@@ -93,7 +91,6 @@ export class ScraperService {
         console.log(`[ScraperService] Searching bookstores in parallel for ISBN: ${isbn}`)
 
         const stores = [
-            { name: 'Buscalibre', url: `https://www.buscalibre.com.ar/libros/search?q=${isbn}` },
             { name: 'Cuspide', url: `https://www.cuspide.com/resultados.aspx?c=${isbn}&por=isbn` },
             { name: 'SBS', url: `https://www.sbs.com.ar/resultados.aspx?c=${isbn}&por=isbn` },
             { name: 'CasaDelLibro', url: `https://www.casadellibro.com/buscar?q=${isbn}` },
@@ -309,48 +306,6 @@ export class ScraperService {
         return data
     }
 
-    private parseBuscalibre(html: string): ScrapedData {
-        const data: ScrapedData = {}
-        const titleMatch = html.match(/<h1[^>]*itemprop="name"[^>]*>([\s\S]*?)<\/h1>/i) ||
-            html.match(/<h3[^>]*class="nombre"[^>]*>([\s\S]*?)<\/h3>/i) ||
-            html.match(/<div[^>]*class="nombre"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i)
-            
-        if (titleMatch) {
-            data.title = this.clean(titleMatch[1])
-        }
-
-        const authorMatch = html.match(/<div[^>]*class="autor"[^>]*>([\s\S]*?)<\/div>/i) ||
-            html.match(/itemprop="author"[\s\S]*?>([\s\S]*?)<\/a>/i) ||
-            html.match(/<div[^>]*class="author"[^>]*>([\s\S]*?)<\/div>/i)
-        if (authorMatch) data.authors = [this.clean(authorMatch[1])]
-
-        // Clean title using authors if available
-        if (data.title) {
-            data.title = this.cleanTitle(data.title, data.authors)
-        }
-
-        const descMatch = html.match(/<div[^>]*id="descripcion"[^>]*>([\s\S]*?)<\/div>/i) ||
-            html.match(/<div[^>]*class="sinopsis"[^>]*>([\s\S]*?)<\/div>/i)
-        if (descMatch) {
-            let desc = this.clean(descMatch[1])
-            // Remove Buscalibre SEO suffix from descriptions
-            const seoSuffix = /Libro\s+.*?\s+De\s+.*?\s+-\s+Buscalibre.*?$/i
-            desc = desc.replace(seoSuffix, '').trim()
-            data.description = desc
-        }
-
-        const coverMatch = html.match(/<img[^>]*id="primaryimage"[^>]*src="([\s\S]*?)"/i) ||
-            html.match(/<img[^>]*class="box-foto"[^>]*src="([\s\S]*?)"/i) ||
-            html.match(/<img[^>]*class="imagen-tapa"[^>]*src="([\s\S]*?)"/i)
-        if (coverMatch) data.coverPath = coverMatch[1]
-
-        const pubMatch = html.match(/Editorial:[\s\S]*?>([\s\S]*?)<\/a>/i) ||
-            html.match(/data-editorial="([^"]+)"/i) ||
-            html.match(/Editorial:[\s\S]*?<span>([\s\S]*?)<\/span>/i)
-        if (pubMatch) data.publisher = this.clean(pubMatch[1])
-
-        return data
-    }
 
     private parseTematika(html: string): ScrapedData {
         const data: ScrapedData = {}
@@ -558,8 +513,7 @@ export class ScraperService {
             /\s*[|\-]\s*Galerna[\s\S]*$/i,
             /\s*[|\-]\s*SBS[\s\S]*$/i,
             /\s*[|\-]\s*Lecturalia[\s\S]*$/i,
-            /\s*[|\-]\s*Casa del Libro[\s\S]*$/i,
-            /\s*[|\-]\s*Buscalibre[\s\S]*$/i
+            /\s*[|\-]\s*Casa del Libro[\s\S]*$/i
         ]
 
         for (const pattern of seoSpamPatterns) {
@@ -573,13 +527,6 @@ export class ScraperService {
         
         // Remove "Libro " prefix
         cleaned = cleaned.replace(/^Libro\s+/i, '')
-        
-        // If it contains "Buscalibre", we know it's one of those SEO titles
-        if (cleaned.toLowerCase().includes('buscalibre')) {
-            // Try to find the last " de " before the author or before " - Buscalibre"
-            // Use greedy match to handle "de" inside titles
-            cleaned = cleaned.replace(/^(.*)\s+de\s+.*?\s*-\s*Buscalibre.*$/i, '$1')
-        }
 
         // If we have authors, try to remove trailing " de [Author]"
         if (authors.length > 0) {
@@ -591,12 +538,6 @@ export class ScraperService {
             }
         }
         
-        // Final sanity check for remaining " de " at the end if it's very long
-        // (Buscalibre titles often look like "Libro Título de Autor")
-        if (title.toLowerCase().startsWith('libro ')) {
-            cleaned = cleaned.replace(/^(.*)\s+de\s+.*?$/i, '$1')
-        }
-
         return cleaned.trim()
     }
 }
