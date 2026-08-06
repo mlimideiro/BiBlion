@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Book, Config } from '../types'
 import { BookListItem } from './BookListItem'
 import { SearchBar, SizeSelector } from './SearchBar'
+import { SortControls, SortField, SortDirection } from './SortControls'
 import { dataService } from '../services/dataService'
 import { X, Sparkles, Trash2, ChevronRight, HandHelping } from 'lucide-react'
 
@@ -32,6 +33,8 @@ export const LibraryView: React.FC<Props> = ({
     )
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedTag, setSelectedTag] = useState<string | null>(null)
+    const [sortField, setSortField] = useState<SortField>('none')
+    const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
     const [selectedBook, setSelectedBook] = useState<Book | null>(null)
     const [isEditingBook, setIsEditingBook] = useState(false)
     const [repairing, setRepairing] = useState(false)
@@ -44,6 +47,15 @@ export const LibraryView: React.FC<Props> = ({
     const handleSetMobileLayout = (mode: 'list' | 'grid' | 'full') => {
         setMobileLayout(mode)
         localStorage.setItem('mobileLayout', mode)
+    }
+
+    const handleSortChange = (field: 'title' | 'author') => {
+        if (sortField !== field) {
+            setSortField(field)
+            setSortDirection('asc')
+        } else {
+            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+        }
     }
 
     useEffect(() => {
@@ -60,7 +72,6 @@ export const LibraryView: React.FC<Props> = ({
             // If viewing all libraries, filter out wishlist books
             result = result.filter(b => b.status !== 'wishlist')
         }
-        // If config.activeLibraryId is null/undefined, show all books (default)
 
         // 2. Filter by Search
         if (searchQuery) {
@@ -77,8 +88,25 @@ export const LibraryView: React.FC<Props> = ({
             result = result.filter(b => b.tags?.includes(selectedTag))
         }
 
+        // 4. Sort
+        if (sortField === 'title') {
+            result = [...result].sort((a, b) => {
+                const titleA = (a.title || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                const titleB = (b.title || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                const comp = titleA.localeCompare(titleB)
+                return sortDirection === 'asc' ? comp : -comp
+            })
+        } else if (sortField === 'author') {
+            result = [...result].sort((a, b) => {
+                const authorA = (Array.isArray(a.authors) && a.authors.length > 0 ? a.authors[0] : '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                const authorB = (Array.isArray(b.authors) && b.authors.length > 0 ? b.authors[0] : '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                const comp = authorA.localeCompare(authorB)
+                return sortDirection === 'asc' ? comp : -comp
+            })
+        }
+
         setFilteredBooks(result)
-    }, [books, config, searchQuery, selectedTag])
+    }, [books, config, searchQuery, selectedTag, sortField, sortDirection])
 
     const handleSearch = (query: string) => {
         setSearchQuery(query)
@@ -173,13 +201,20 @@ export const LibraryView: React.FC<Props> = ({
             )}
             <div className="library-search-container">
                 <SearchBar onSearch={handleSearch} />
-                <SizeSelector
-                    thumbnailSize={thumbnailSize}
-                    setThumbnailSize={handleSaveThumbnailSize}
-                    isMobile={isMobile}
-                    mobileLayout={mobileLayout}
-                    onSetMobileLayout={handleSetMobileLayout}
-                />
+                <div className="view-controls-group" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <SortControls
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSortChange={handleSortChange}
+                    />
+                    <SizeSelector
+                        thumbnailSize={thumbnailSize}
+                        setThumbnailSize={handleSaveThumbnailSize}
+                        isMobile={isMobile}
+                        mobileLayout={mobileLayout}
+                        onSetMobileLayout={handleSetMobileLayout}
+                    />
+                </div>
             </div>
 
             {config && config.tags.length > 0 && (

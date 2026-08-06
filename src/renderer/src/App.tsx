@@ -12,6 +12,7 @@ import { Login } from './components/Login'
 import { AdminDashboard } from './components/AdminDashboard'
 import { LoansModal } from './components/LoansModal'
 import { WishlistModal } from './components/WishlistModal'
+import { SortControls, SortField, SortDirection } from './components/SortControls'
 
 
 function App() {
@@ -21,6 +22,8 @@ function App() {
     const [isLoggedIn, setIsLoggedIn] = useState(!!currentUser)
     const [isSuperAdmin, setIsSuperAdmin] = useState(localStorage.getItem('biblion_role') === 'admin')
     const [filteredBooks, setFilteredBooks] = useState<Book[]>([])
+    const [sortField, setSortField] = useState<SortField>('none')
+    const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
     const [menuOpen, setMenuOpen] = useState(false)
     const [settingsView, setSettingsView] = useState<'libraries' | 'tags' | null>(null)
     const [loansOpen, setLoansOpen] = useState(false)
@@ -154,8 +157,34 @@ function App() {
             result = result.filter(b => Array.isArray(b.tags) && b.tags.includes(selectedTag))
         }
 
+        // 4. Sort
+        if (sortField === 'title') {
+            result = [...result].sort((a, b) => {
+                const titleA = (a.title || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                const titleB = (b.title || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                const comp = titleA.localeCompare(titleB)
+                return sortDirection === 'asc' ? comp : -comp
+            })
+        } else if (sortField === 'author') {
+            result = [...result].sort((a, b) => {
+                const authorA = (Array.isArray(a.authors) && a.authors.length > 0 ? a.authors[0] : '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                const authorB = (Array.isArray(b.authors) && b.authors.length > 0 ? b.authors[0] : '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                const comp = authorA.localeCompare(authorB)
+                return sortDirection === 'asc' ? comp : -comp
+            })
+        }
+
         setFilteredBooks(result)
-    }, [books, config, searchQuery, selectedTag])
+    }, [books, config, searchQuery, selectedTag, sortField, sortDirection])
+
+    const handleSortChange = (field: 'title' | 'author') => {
+        if (sortField !== field) {
+            setSortField(field)
+            setSortDirection('asc')
+        } else {
+            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+        }
+    }
 
     const normalizeText = (text: string) => {
         return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
@@ -738,6 +767,11 @@ function App() {
 
             <div className="main-content">
                 <div className="view-controls">
+                    <SortControls
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSortChange={handleSortChange}
+                    />
                     <SizeSelector
                         thumbnailSize={thumbnailSize}
                         setThumbnailSize={setThumbnailSize}

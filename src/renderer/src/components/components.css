@@ -112,7 +112,7 @@ body {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 40px;
+    padding: 20px 40px 40px 40px;
     margin: 0 auto;
     width: 100%;
     box-sizing: border-box;
@@ -123,7 +123,7 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(var(--book-w), 1fr));
     gap: 30px;
-    padding-top: 30px;
+    padding-top: 10px;
     width: 100%;
 }
 
@@ -299,46 +299,76 @@ body {
     font-size: 0.95rem;
 }
 
-/* View Controls (Size Selector) */
+/* View Controls (Size & Sort Selector) */
 .view-controls {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
     width: 100%;
-    margin-bottom: 20px;
+    margin-bottom: 5px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    padding: 5px 0;
+    background: transparent;
+    pointer-events: none;
 }
 
-.size-selector-pills {
-    background: rgba(255, 255, 255, 0.03);
+.size-selector-pills,
+.sort-selector-pills {
+    pointer-events: auto;
+    background: rgba(35, 35, 45, 0.75);
     border-radius: 25px;
-    padding: 4px;
+    padding: 3px 4px;
     display: flex;
+    align-items: center;
     gap: 2px;
     border: 1px solid var(--glass-border);
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    height: 36px;
+    box-sizing: border-box;
 }
 
-.size-btn {
+.size-btn,
+.sort-btn {
     background: transparent;
     border: 1px solid transparent;
     color: var(--text-secondary);
-    padding: 6px 16px;
+    padding: 0 14px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 20px;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 500;
     transition: var(--transition);
+    box-sizing: border-box;
+    outline: none !important;
 }
 
-.size-btn:hover {
+.size-btn:focus,
+.size-btn:focus-visible,
+.sort-btn:focus,
+.sort-btn:focus-visible {
+    outline: none !important;
+}
+
+.size-btn:hover,
+.sort-btn:hover {
     color: white;
 }
 
-.size-btn.active {
-    background: rgba(0, 0, 0, 0.3);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    /* More visible frame */
-    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+.size-btn.active,
+.sort-btn.active {
+    background: rgba(139, 123, 168, 0.2);
+    color: #c4b5fd;
+    border: 1px solid rgba(139, 123, 168, 0.35);
+    box-shadow: none;
+    outline: none !important;
 }
 
 /* Modal */
@@ -1196,37 +1226,7 @@ body {
     padding: 8px 20px;
 }
 
-.size-selector-pills {
-    display: flex;
-    background: #2d2d2d;
-    padding: 5px;
-    border-radius: 30px;
-    gap: 2px;
-}
 
-.size-btn {
-    background: none;
-    border: none;
-    color: #888;
-    padding: 8px 15px;
-    border-radius: 20px;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-}
-
-.size-btn:hover {
-    color: #ccc;
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.size-btn.active {
-    color: var(--accent);
-    background: rgba(187, 134, 252, 0.15);
-    font-weight: 800;
-    transform: scale(1.1);
-}
 
 /* Edit Mode & Scraper UI */
 .edit-input,
