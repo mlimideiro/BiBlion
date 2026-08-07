@@ -303,15 +303,21 @@ body {
 .view-controls {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     width: 100%;
-    margin-bottom: 5px;
     position: sticky;
     top: 0;
     z-index: 50;
-    padding: 5px 0;
+    height: 0;
+    overflow: visible;
+    padding: 0;
     background: transparent;
     pointer-events: none;
+}
+
+.sort-selector-container,
+.size-selector-container {
+    pointer-events: auto;
 }
 
 .size-selector-pills,
@@ -622,11 +628,12 @@ body {
 .tags-carousel-wrapper {
     position: relative;
     width: 100%;
-    max-width: 900px;
-    margin: 10px auto 20px;
-    /* Fade effect on both sides (aggressive 15% fade for visibility) */
-    mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+    max-width: calc(100% - 320px);
+    margin: 0 auto 20px;
+    pointer-events: auto;
+    /* Fade effect on both sides */
+    mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
 }
 
 .tag-pills-container {
@@ -634,15 +641,12 @@ body {
     grid-template-rows: repeat(2, auto);
     grid-auto-flow: column;
     grid-auto-columns: max-content;
-    gap: 10px;
+    gap: 8px;
     overflow-x: auto;
-    padding: 10px 20px 15px;
+    padding: 0 10px 5px;
     scrollbar-width: none !important;
-    /* Firefox */
     -ms-overflow-style: none !important;
-    /* IE/Edge */
-    justify-content: flex-start;
-    /* Change from center to allow scroll start from left */
+    justify-content: center;
     scroll-behavior: smooth;
 }
 

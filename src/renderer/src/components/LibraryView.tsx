@@ -201,12 +201,35 @@ export const LibraryView: React.FC<Props> = ({
             )}
             <div className="library-search-container">
                 <SearchBar onSearch={handleSearch} />
-                <div className="view-controls-group" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <div className="view-controls-group" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', width: '100%' }}>
                     <SortControls
                         sortField={sortField}
                         sortDirection={sortDirection}
                         onSortChange={handleSortChange}
                     />
+
+                    {config && config.tags.length > 0 && (
+                        <div className="tags-carousel-wrapper">
+                            <div className="tag-pills-container">
+                                <div
+                                    className={`tag-pill ${selectedTag === null ? 'active' : ''}`}
+                                    onClick={() => setSelectedTag(null)}
+                                >
+                                    Todos
+                                </div>
+                                {config.tags.map(tag => (
+                                    <div
+                                        key={tag}
+                                        className={`tag-pill ${selectedTag === tag ? 'active' : ''}`}
+                                        onClick={() => setSelectedTag(tag)}
+                                    >
+                                        {tag}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <SizeSelector
                         thumbnailSize={thumbnailSize}
                         setThumbnailSize={handleSaveThumbnailSize}
@@ -216,28 +239,6 @@ export const LibraryView: React.FC<Props> = ({
                     />
                 </div>
             </div>
-
-            {config && config.tags.length > 0 && (
-                <div className="tags-carousel-wrapper">
-                    <div className="tag-pills-container">
-                        <div
-                            className={`tag-pill ${selectedTag === null ? 'active' : ''}`}
-                            onClick={() => setSelectedTag(null)}
-                        >
-                            Todos
-                        </div>
-                        {config.tags.map(tag => (
-                            <div
-                                key={tag}
-                                className={`tag-pill ${selectedTag === tag ? 'active' : ''}`}
-                                onClick={() => setSelectedTag(tag)}
-                            >
-                                {tag}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
 
             <div className={`book-list size-${thumbnailSize} ${isMobile ? `mode-${mobileLayout}` : ''}`}>
                 {filteredBooks.map(book => (
