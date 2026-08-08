@@ -255,7 +255,8 @@ export class MetadataService {
             const response = await axios.get(url, {
                 headers: {
                     'Accept': 'text/html',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8'
                 },
                 httpsAgent: new https.Agent({ rejectUnauthorized: false }),
                 timeout: 10000 
@@ -295,20 +296,16 @@ export class MetadataService {
 
     private async fetchGoogleBooks(isbn: string, esOnly: boolean): Promise<BookMetadata | null> {
         try {
-            const langParam = esOnly ? '&langRestrict=es' : ''
-            let url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}${langParam}`
-            let response = await axios.get(url, { timeout: 10000 })
+            const result = await this.queryGoogleBooksByIsbn(isbn, esOnly)
+            if (result) return result
 
-            if (response.data.totalItems === 0) {
-                url = `https://www.googleapis.com/books/v1/volumes?q=${isbn}${langParam}`
-                response = await axios.get(url, { timeout: 10000 })
-            }
-
-            if (response.data.totalItems > 0 && response.data.items?.length > 0) {
-                return this.mapGoogleBook(response.data.items[0].volumeInfo)
+            // Many AR editions exist in Google but are not tagged as Spanish
+            if (esOnly) {
+                console.log(`[MetadataService] Google Books: no es hit for ${isbn}, retrying without langRestrict`)
+                return await this.queryGoogleBooksByIsbn(isbn, false)
             }
         } catch (error: any) {
-            if (error.response && error.response.status === 429) {
+            if (error.message === 'GOOGLE_429' || (error.response && error.response.status === 429)) {
                 throw new Error('GOOGLE_429')
             }
             console.warn(`Google Books (ISBN=${isbn}) failed:`, error.message)
@@ -316,17 +313,38 @@ export class MetadataService {
         return null
     }
 
+    private async queryGoogleBooksByIsbn(isbn: string, esOnly: boolean): Promise<BookMetadata | null> {
+        const langParam = esOnly ? '&langRestrict=es' : ''
+        let url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}${langParam}`
+        let response = await axios.get(url, { timeout: 10000 })
+
+        if (response.data.totalItems === 0) {
+            url = `https://www.googleapis.com/books/v1/volumes?q=${isbn}${langParam}`
+            response = await axios.get(url, { timeout: 10000 })
+        }
+
+        if (response.data.totalItems > 0 && response.data.items?.length > 0) {
+            return this.mapGoogleBook(response.data.items[0].volumeInfo)
+        }
+        return null
+    }
+
     private async fetchGoogleByTitle(title: string, author: string): Promise<Partial<BookMetadata> | null> {
         try {
             const query = `intitle:${encodeURIComponent(title)}${author ? `+inauthor:${encodeURIComponent(author)}` : ''}`
-            const url = `https://www.googleapis.com/books/v1/volumes?q=${query}&langRestrict=es&maxResults=3`
-            const response = await axios.get(url)
-
-            if (response.data.totalItems > 0 && response.data.items?.length > 0) {
-                const items = response.data.items
-                const best = items.find((i: any) => i.volumeInfo.description) || items[0]
-                return this.mapGoogleBook(best.volumeInfo)
+            const trySearch = async (esOnly: boolean) => {
+                const langParam = esOnly ? '&langRestrict=es' : ''
+                const url = `https://www.googleapis.com/books/v1/volumes?q=${query}${langParam}&maxResults=3`
+                const response = await axios.get(url, { timeout: 10000 })
+                if (response.data.totalItems > 0 && response.data.items?.length > 0) {
+                    const items = response.data.items
+                    const best = items.find((i: any) => i.volumeInfo.description) || items[0]
+                    return this.mapGoogleBook(best.volumeInfo)
+                }
+                return null
             }
+
+            return (await trySearch(true)) || (await trySearch(false))
         } catch (error) {
             console.warn('Google Books (Title Search) failed:', error)
         }
