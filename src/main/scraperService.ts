@@ -64,19 +64,16 @@ export class ScraperService {
             },
             {
                 name: 'Tematika',
-                urls: [
-                    `https://www.tematika.com/?q=${isbn}`,
-                    `https://www.tematika.com/search/?q=${isbn}`
-                ],
-                followProduct: true
+                // Avoid homepage (?q=) — it returns store OG tags + unrelated featured products
+                urls: [`https://www.tematika.com/search/?q=${isbn}`],
+                followProduct: true,
+                requireIsbnMatch: true
             },
             {
                 name: 'Galerna',
-                urls: [
-                    `https://www.galernaweb.com/?q=${isbn}`,
-                    `https://www.galernaweb.com/search/?q=${isbn}`
-                ],
-                followProduct: true
+                urls: [`https://www.galernaweb.com/search/?q=${isbn}`],
+                followProduct: true,
+                requireIsbnMatch: true
             },
             {
                 name: 'Lecturalia',
@@ -263,9 +260,14 @@ export class ScraperService {
 
         if (!data.title || !data.description || !data.coverPath) {
             const generic = this.parseGeneric(html)
-            if (!data.title) data.title = generic.title
-            if (!data.description) data.description = generic.description
-            if (!data.coverPath) data.coverPath = generic.coverPath
+            // Never adopt storefront OG tags as book metadata
+            if (!data.title && generic.title && !this.isErrorTitle(generic.title)) data.title = generic.title
+            if (!data.description && generic.description && !this.isStorePromoText(generic.description)) {
+                data.description = generic.description
+            }
+            if (!data.coverPath && generic.coverPath && !this.isStoreBrandCover(generic.coverPath, generic.title)) {
+                data.coverPath = generic.coverPath
+            }
             if (!data.isbn && generic.isbn) data.isbn = generic.isbn
         }
 
@@ -373,6 +375,7 @@ export class ScraperService {
         if (!data.title) return false
         if (this.isErrorTitle(data.title)) return false
         if (data.title.length < 3) return false
+        if (data.description && this.isStorePromoText(data.description)) return false
         return true
     }
 
@@ -657,7 +660,8 @@ export class ScraperService {
             'oops', '404', 'no se encontró', 'no se encontro', 'sin resultados',
             'página no encontrada', 'pagina no encontrada', 'error de página',
             'resultados.aspx', 'busqueda.aspx', 'no se encontraron resultados',
-            'acceso denegado', 'access denied', 'página solicitada no existe'
+            'acceso denegado', 'access denied', 'página solicitada no existe',
+            'resultados de la búsqueda', 'resultados de la busqueda'
         ]
 
         if (errorKeywords.some(kw => lowerTitle.includes(kw))) return true
@@ -665,7 +669,37 @@ export class ScraperService {
         const exactErrors = ['error', 'oops', 'búsqueda', 'busqueda', 'resultados']
         if (exactErrors.includes(lowerTitle)) return true
 
+        // Storefront / brand pages mistaken for books (Yenny homepage OG tags, etc.)
+        const storeTitles = [
+            'yenny - el ateneo', 'yenny', 'el ateneo', 'tematika', 'tematika.com',
+            'cúspide', 'cuspide', 'cuspide.com', 'galerna', 'sbs', 'sbs librerías',
+            'sbs librerias', 'casa del libro', 'lecturalia', 'mercado libre', 'mercadolibre'
+        ]
+        if (storeTitles.includes(lowerTitle)) return true
+        if (/^yenny\b/i.test(lowerTitle) && /el ateneo/i.test(lowerTitle)) return true
+        // "8428612404 - Yenny - El Ateneo" / "ISBN | Tematika"
+        if (/^\d{10,13}\s*[-–|:]\s*(yenny|tematika|cúspide|cuspide|galerna|sbs|casa del libro)/i.test(title)) return true
+
         return false
+    }
+
+    private isStorePromoText(text: string): boolean {
+        const lower = text.toLowerCase()
+        return [
+            'somos yenny',
+            'retail de entretenimiento cultural',
+            'yenny - el ateneo el retail',
+            'en nuestro sitio podrás encontrar libros, música',
+            'en nuestro sitio podr&aacute;s encontrar',
+            'la librería más grande',
+            'comprá online en'
+        ].some(kw => lower.includes(kw))
+    }
+
+    private isStoreBrandCover(coverUrl: string, title?: string): boolean {
+        if (title && this.isErrorTitle(title)) return true
+        const lower = coverUrl.toLowerCase()
+        return /logo|favicon|placeholder|default[-_]?cover|yenny|ateneo[-_]?logo/i.test(lower)
     }
 
     private parseGeneric(html: string): ScrapedData {
@@ -694,12 +728,31 @@ export class ScraperService {
     private clean(text: string): string {
         let cleaned = text
             .replace(/<[^>]*>/g, '')
-            .replace(/&nbsp;/g, ' ')
+            .replace(/&nbsp;/gi, ' ')
+            .replace(/&amp;/gi, '&')
+            .replace(/&quot;/gi, '"')
+            .replace(/&#39;/gi, "'")
+            .replace(/&apos;/gi, "'")
+            .replace(/&aacute;/gi, 'á')
+            .replace(/&eacute;/gi, 'é')
+            .replace(/&iacute;/gi, 'í')
+            .replace(/&oacute;/gi, 'ó')
+            .replace(/&uacute;/gi, 'ú')
+            .replace(/&ntilde;/gi, 'ñ')
+            .replace(/&Aacute;/g, 'Á')
+            .replace(/&Eacute;/g, 'É')
+            .replace(/&Iacute;/g, 'Í')
+            .replace(/&Oacute;/g, 'Ó')
+            .replace(/&Uacute;/g, 'Ú')
+            .replace(/&Ntilde;/g, 'Ñ')
+            .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+            .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
             .replace(/\s+/g, ' ')
             .trim()
 
         const seoSpamPatterns = [
             /\s*[|\-]\s*Tematika\.com[\s\S]*$/i,
+            /\s*[|\-]\s*Yenny\s*[-–]\s*El Ateneo[\s\S]*$/i,
             /\s*[|\-]\s*Cúspide\.com[\s\S]*$/i,
             /\s*[|\-]\s*Cuspide\.com[\s\S]*$/i,
             /\s*[|\-]\s*Galerna[\s\S]*$/i,

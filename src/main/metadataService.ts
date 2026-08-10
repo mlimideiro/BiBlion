@@ -25,9 +25,14 @@ export class MetadataService {
         const cleanIsbn = this.normalizeIsbn(isbn)
         const searchIsbn = cleanIsbn.toUpperCase()
 
-        // 1. Check Cache first
+        // 1. Check Cache first (ignore poisoned storefront hits like "Yenny - El Ateneo")
         const cached = this.cache.get(searchIsbn)
-        if (cached) return cached
+        if (cached) {
+            if (cached.title && !this.isErrorTitle(cached.title) && !this.isStorePromoText(cached.description)) {
+                return cached
+            }
+            console.warn(`[MetadataService] Ignoring bad cached metadata for ${searchIsbn}: ${cached.title}`)
+        }
 
         // If it's not a real ISBN-like string, we only do title search
         const isRealIsbn = searchIsbn.length >= 10 && searchIsbn.length <= 13 && /^[0-9X]+$/.test(searchIsbn)
@@ -45,11 +50,18 @@ export class MetadataService {
 
         // --- Tiered Parallel Search ---
 
+        const isbnVariants = this.expandIsbnVariants(searchIsbn)
+
         // Tier 1: Fast & Reliable
         console.log('[MetadataService] Tier 1: Google + OpenLibrary')
         const tier1 = await Promise.allSettled([
             this.fetchGoogleBooks(searchIsbn, true),
-            this.fetchOpenLibrary(searchIsbn)
+            this.fetchOpenLibrary(searchIsbn),
+            // ISBN-10 scans often need the ISBN-13 form in catalogs
+            ...(isbnVariants[1] ? [
+                this.fetchGoogleBooks(isbnVariants[1], true),
+                this.fetchOpenLibrary(isbnVariants[1])
+            ] : [])
         ])
         results.push(...tier1.map(r => r.status === 'fulfilled' ? (r as PromiseFulfilledResult<any>).value : null))
 
@@ -65,8 +77,11 @@ export class MetadataService {
         console.log('[MetadataService] Tier 2: Bookstore Scrapers')
         if (this.scraperService) {
             try {
-                const scraped = await this.scraperService.findByIsbn(searchIsbn)
-                if (scraped) {
+                let scraped = await this.scraperService.findByIsbn(searchIsbn)
+                if (!scraped && isbnVariants[1]) {
+                    scraped = await this.scraperService.findByIsbn(isbnVariants[1])
+                }
+                if (scraped && scraped.title && !this.isErrorTitle(scraped.title) && !this.isStorePromoText(scraped.description)) {
                     results.push({
                         title: scraped.title,
                         authors: scraped.authors,
@@ -132,8 +147,32 @@ export class MetadataService {
 
     private isErrorTitle(title: string): boolean {
         const lowerTitle = title.toLowerCase().trim()
-        const errorKeywords = ['oops', '404', 'no se encontró', 'no se encontro', 'sin resultados', 'página no encontrada']
-        return errorKeywords.some(kw => lowerTitle.includes(kw))
+        const errorKeywords = [
+            'oops', '404', 'no se encontró', 'no se encontro', 'sin resultados',
+            'página no encontrada', 'resultados de la búsqueda', 'resultados de la busqueda'
+        ]
+        if (errorKeywords.some(kw => lowerTitle.includes(kw))) return true
+
+        const storeTitles = [
+            'yenny - el ateneo', 'yenny', 'el ateneo', 'tematika', 'tematika.com',
+            'cúspide', 'cuspide', 'galerna', 'casa del libro', 'lecturalia', 'mercado libre'
+        ]
+        if (storeTitles.includes(lowerTitle)) return true
+        if (/^yenny\b/i.test(lowerTitle) && /el ateneo/i.test(lowerTitle)) return true
+        if (/^\d{10,13}\s*[-–|:]\s*(yenny|tematika|cúspide|cuspide|galerna)/i.test(title)) return true
+        return false
+    }
+
+    private isStorePromoText(text?: string): boolean {
+        if (!text) return false
+        const lower = text.toLowerCase()
+        return [
+            'somos yenny',
+            'retail de entretenimiento cultural',
+            'yenny - el ateneo el retail',
+            'en nuestro sitio podrás encontrar libros, música',
+            'en nuestro sitio podr&aacute;s encontrar'
+        ].some(kw => lower.includes(kw))
     }
 
     private finalizeMetadata(metadata: BookMetadata): BookMetadata {
@@ -195,7 +234,9 @@ export class MetadataService {
     }
 
     private mergeResults(results: BookMetadata[], isbn: string): BookMetadata | null {
-        const valid = results.filter(r => r && r.title)
+        const valid = results.filter(r =>
+            r && r.title && !this.isErrorTitle(r.title) && !this.isStorePromoText(r.description)
+        )
         if (valid.length === 0) return null
 
         // 1. Pick the best title (prefer longer ones usually, but avoiding SEO spam)
@@ -247,6 +288,41 @@ export class MetadataService {
     private normalizeIsbn(isbn: string): string {
         let clean = isbn.replace(/^(WISH-|OL-)/i, '')
         return clean.replace(/[^0-9X]/gi, '').toUpperCase()
+    }
+
+    private expandIsbnVariants(isbn: string): string[] {
+        const variants = [isbn]
+        if (isbn.length === 10) {
+            const isbn13 = this.isbn10To13(isbn)
+            if (isbn13) variants.push(isbn13)
+        } else if (isbn.length === 13 && (isbn.startsWith('978') || isbn.startsWith('979'))) {
+            const isbn10 = this.isbn13To10(isbn)
+            if (isbn10) variants.push(isbn10)
+        }
+        return variants
+    }
+
+    private isbn10To13(isbn10: string): string | null {
+        if (!/^\d{9}[\dX]$/i.test(isbn10)) return null
+        const core = '978' + isbn10.slice(0, 9)
+        let sum = 0
+        for (let i = 0; i < 12; i++) {
+            sum += parseInt(core[i], 10) * (i % 2 === 0 ? 1 : 3)
+        }
+        const check = (10 - (sum % 10)) % 10
+        return core + String(check)
+    }
+
+    private isbn13To10(isbn13: string): string | null {
+        if (!/^978\d{10}$/.test(isbn13)) return null
+        const core = isbn13.slice(3, 12)
+        let sum = 0
+        for (let i = 0; i < 9; i++) {
+            sum += parseInt(core[i], 10) * (10 - i)
+        }
+        const rem = (11 - (sum % 11)) % 11
+        const check = rem === 10 ? 'X' : String(rem)
+        return core + check
     }
 
     private async fetchBNE(isbn: string): Promise<BookMetadata | null> {
