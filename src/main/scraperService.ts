@@ -299,7 +299,11 @@ export class ScraperService {
 
     private isProductQuality(data: ScrapedData): boolean {
         if (!data.title || this.isErrorTitle(data.title) || data.title.length < 3) return false
-        return !!(data.coverPath || data.description || (data.authors && data.authors.length > 0))
+        if (this.isIsbnLikeTitle(data.title, data.isbn)) return false
+        // Minimum: real title + (author OR cover)
+        const hasAuthor = !!(data.authors && data.authors.some(a => !!a && a.trim().length > 1))
+        const hasCover = !!data.coverPath
+        return hasAuthor || hasCover
     }
 
     private extractProductLinks(html: string, pageUrl: string): string[] {
@@ -308,16 +312,16 @@ export class ScraperService {
         const patterns = [
             /href="(https?:\/\/(?:www\.)?cuspide\.com\/producto\/[^"]+)"/gi,
             /href="(\/producto\/[^"]+)"/gi,
+            /href="(https?:\/\/(?:www\.)?tematika\.com\/productos\/[^"]+)"/gi,
+            /href="(\/productos\/[^"]+)"/gi,
             /<a[^>]*class="[^"]*nombre[^"]*"[^>]*href="([^"]+)"/gi,
             /<a[^>]*href="([^"]+)"[^>]*class="[^"]*nombre[^"]*"/gi,
-            /href="([^"]*\/isbn\/[^"]+)"/gi,
-            /href="([^"]*\/[Ll]ibro\/[^"]+)"/gi,
-            /href="([^"]*\/productos\/[^"]+)"/gi,
+            /href="([^"]*\/isbn\/\d{10,13}[^"]*)"/gi,
             /<a[^>]*class="[^"]*product-item-link[^"]*"[^>]*href="([^"]+)"/gi,
             /<a[^>]*href="([^"]+)"[^>]*class="[^"]*product-item-link[^"]*"/gi,
             /<a[^>]*class="[^"]*ui-search-link[^"]*"[^>]*href="([^"]+)"/gi,
             /href="(https?:\/\/(?:www\.)?mercadolibre\.com\.ar\/[^"#]+)"/gi,
-            /href="([^"]*\/libro-[^"]+)"/gi
+            /href="([^"]*\/libro-\d[^"]*)"/gi
         ]
 
         for (const pattern of patterns) {
@@ -326,7 +330,10 @@ export class ScraperService {
                 let href = match[1].replace(/&amp;/g, '&').trim()
                 if (!href || href.startsWith('#') || href.startsWith('javascript:')) continue
                 if (/\/feed\/?$/i.test(href)) continue
-                if (/resultados\.aspx|buscar\?|\/search\?|catalogsearch\/result|listado\.mercadolibre|\?s=/i.test(href)) continue
+                // Category/nav pages (Tematika /libros/... is NOT a product)
+                if (/\/libros\//i.test(href) && !/\/productos\//i.test(href)) continue
+                if (/resultados\.aspx|buscar\?|\/search\/?\?|catalogsearch\/result|listado\.mercadolibre|\?s=/i.test(href)) continue
+                if (/\/(categoria|category|coleccion|editorial|autor|etiqueta)s?\//i.test(href)) continue
 
                 try {
                     const absolute = href.startsWith('http') ? href : new URL(href, origin).toString()
@@ -374,18 +381,43 @@ export class ScraperService {
     private isValidBookData(data: ScrapedData): boolean {
         if (!data.title) return false
         if (this.isErrorTitle(data.title)) return false
+        if (this.isIsbnLikeTitle(data.title, data.isbn)) return false
         if (data.title.length < 3) return false
         if (data.description && this.isStorePromoText(data.description)) return false
-        return true
+        const hasAuthor = !!(data.authors && data.authors.some(a => !!a && a.trim().length > 1))
+        const hasCover = !!data.coverPath
+        return hasAuthor || hasCover
+    }
+
+    private isIsbnLikeTitle(title: string, isbn?: string): boolean {
+        const trimmed = title.trim()
+        const compact = trimmed.replace(/[\s\-]/g, '')
+        if (/^\d{13}$/.test(compact) || /^\d{10}$/.test(compact) || /^\d{9}[\dX]$/i.test(compact)) return true
+        if (isbn) {
+            const normIsbn = isbn.replace(/[^0-9X]/gi, '').toUpperCase()
+            const titleDigits = trimmed.replace(/[^0-9X]/gi, '').toUpperCase()
+            if (titleDigits === normIsbn) return true
+        }
+        if (/^\d{10,13}(\s*[-–|:].*)?$/i.test(trimmed) && trimmed.replace(/[^0-9]/g, '').length >= 10) {
+            const nonDigit = trimmed.replace(/[\d\s\-–|:X]/gi, '')
+            if (nonDigit.length < 3) return true
+        }
+        return false
     }
 
     private extractIsbnFromUrl(url: string): string | undefined {
-        const isbn13Match = url.match(/978\d{10}|979\d{10}/)
-        if (isbn13Match) return isbn13Match[0]
-
-        const isbn10Match = url.match(/\b\d{9}[\dX]\b/)
-        if (isbn10Match) return isbn10Match[0]
-
+        // Only trust ISBNs in the path (e.g. /isbn/978..., /productos/foo-978...).
+        // Query strings (?q=ISBN / ?s=ISBN) are the search key, not page metadata.
+        try {
+            const pathname = new URL(url).pathname
+            const isbn13Match = pathname.match(/97[89]\d{10}/)
+            if (isbn13Match) return isbn13Match[0]
+            const isbn10Match = pathname.match(/(?:isbn\/|[-_])(\d{9}[\dX])(?:\/|$)/i)
+            if (isbn10Match) return isbn10Match[1].toUpperCase()
+        } catch {
+            const isbn13Match = url.split('?')[0].match(/97[89]\d{10}/)
+            if (isbn13Match) return isbn13Match[0]
+        }
         return undefined
     }
 
@@ -679,6 +711,7 @@ export class ScraperService {
         if (/^yenny\b/i.test(lowerTitle) && /el ateneo/i.test(lowerTitle)) return true
         // "8428612404 - Yenny - El Ateneo" / "ISBN | Tematika"
         if (/^\d{10,13}\s*[-–|:]\s*(yenny|tematika|cúspide|cuspide|galerna|sbs|casa del libro)/i.test(title)) return true
+        if (this.isIsbnLikeTitle(title)) return true
 
         return false
     }

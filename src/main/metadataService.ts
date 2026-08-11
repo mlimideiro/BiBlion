@@ -1,5 +1,7 @@
 import axios from 'axios'
 import https from 'https'
+import fs from 'fs-extra'
+import path from 'path'
 import { ScraperService } from './scraperService'
 import { MetadataCache } from './metadataCache'
 
@@ -21,17 +23,29 @@ export class MetadataService {
         this.scraperService = scraper
     }
 
+    private logLookup(message: string) {
+        const line = `[${new Date().toISOString()}] ${message}`
+        console.log(message)
+        try {
+            const logPath = path.join(process.cwd(), 'db_biblion', 'cache', 'lookup.log')
+            fs.ensureDirSync(path.dirname(logPath))
+            fs.appendFileSync(logPath, line + '\n')
+        } catch { /* ignore log IO errors */ }
+    }
+
     async lookup(isbn: string, title?: string, author?: string): Promise<BookMetadata | null> {
         const cleanIsbn = this.normalizeIsbn(isbn)
         const searchIsbn = cleanIsbn.toUpperCase()
+        const started = Date.now()
 
-        // 1. Check Cache first (ignore poisoned storefront hits like "Yenny - El Ateneo")
+        // 1. Check Cache first (ignore incomplete / poisoned hits)
         const cached = this.cache.get(searchIsbn)
         if (cached) {
-            if (cached.title && !this.isErrorTitle(cached.title) && !this.isStorePromoText(cached.description)) {
+            if (this.isCompleteEnough(cached, searchIsbn)) {
+                this.logLookup(`[Lookup] CACHE HIT ${searchIsbn}: "${cached.title}"`)
                 return cached
             }
-            console.warn(`[MetadataService] Ignoring bad cached metadata for ${searchIsbn}: ${cached.title}`)
+            console.warn(`[MetadataService] Ignoring incomplete/bad cache for ${searchIsbn}: ${cached.title}`)
         }
 
         // If it's not a real ISBN-like string, we only do title search
@@ -45,7 +59,7 @@ export class MetadataService {
             return null
         }
 
-        console.log(`[MetadataService] Overhauling lookup for ISBN: ${searchIsbn}`)
+        this.logLookup(`[Lookup] START ${searchIsbn}`)
         let results: (BookMetadata | Partial<BookMetadata> | null)[] = []
 
         // --- Tiered Parallel Search ---
@@ -63,14 +77,21 @@ export class MetadataService {
                 this.fetchOpenLibrary(isbnVariants[1])
             ] : [])
         ])
-        results.push(...tier1.map(r => r.status === 'fulfilled' ? (r as PromiseFulfilledResult<any>).value : null))
+        const tier1Values = tier1.map(r => r.status === 'fulfilled' ? (r as PromiseFulfilledResult<any>).value : null)
+        results.push(...tier1Values)
+        this.logLookup(`[Lookup] Tier1 ${searchIsbn}: ${tier1Values.map((r, i) => r?.title ? `#${i}="${r.title}"` : `#${i}=null`).join(', ')}`)
 
-        // Check if Tier 1 is "good enough" (has title, author, and Spanish description)
-        const bestTier1 = results.find(r => r && r.title && r.description && !this.isEnglish(r.description))
-        if (bestTier1 && bestTier1.coverUrl) {
-            const finalBook = { isbn: searchIsbn, ...bestTier1 } as BookMetadata
-            this.cache.set(searchIsbn, finalBook)
-            return finalBook
+        // Early exit only with a complete hit (real title + author or cover)
+        const bestTier1 = results.find(r =>
+            r && this.isCompleteEnough(r, searchIsbn) && r.description && !this.isEnglish(r.description) && r.coverUrl
+        )
+        if (bestTier1) {
+            const finalBook = this.finalizeMetadata({ isbn: searchIsbn, ...bestTier1 } as BookMetadata)
+            if (this.isCompleteEnough(finalBook, searchIsbn)) {
+                this.cache.set(searchIsbn, finalBook)
+                this.logLookup(`[Lookup] OK tier1 ${searchIsbn} (${Date.now() - started}ms): "${finalBook.title}"`)
+                return finalBook
+            }
         }
 
         // Tier 2: Bookstore Scrapers (Regional focus)
@@ -81,18 +102,28 @@ export class MetadataService {
                 if (!scraped && isbnVariants[1]) {
                     scraped = await this.scraperService.findByIsbn(isbnVariants[1])
                 }
-                if (scraped && scraped.title && !this.isErrorTitle(scraped.title) && !this.isStorePromoText(scraped.description)) {
-                    results.push({
+                if (scraped) {
+                    const scrapedMeta: Partial<BookMetadata> = {
                         title: scraped.title,
                         authors: scraped.authors,
                         publisher: scraped.publisher,
                         description: scraped.description,
                         coverUrl: scraped.coverPath,
-                        pageCount: scraped.pageCount
-                    })
+                        pageCount: scraped.pageCount,
+                        isbn: scraped.isbn || searchIsbn
+                    }
+                    if (this.hasRealTitle(scrapedMeta, searchIsbn) && !this.isStorePromoText(scrapedMeta.description)) {
+                        results.push(scrapedMeta)
+                        this.logLookup(`[Lookup] Tier2 ${searchIsbn}: "${scrapedMeta.title}" authors=${scrapedMeta.authors?.length || 0} cover=${!!scrapedMeta.coverUrl}`)
+                    } else {
+                        this.logLookup(`[Lookup] Tier2 discard ${searchIsbn}: "${scraped.title}"`)
+                    }
+                } else {
+                    this.logLookup(`[Lookup] Tier2 ${searchIsbn}: no store hit`)
                 }
             } catch (e) {
                 console.warn('[MetadataService] Tier 2 error:', e)
+                this.logLookup(`[Lookup] Tier2 error ${searchIsbn}: ${(e as Error).message}`)
             }
         }
 
@@ -110,16 +141,18 @@ export class MetadataService {
         if (merged) {
             // Final fallback: if merged has no description or is English, try title search as last resort
             if (!merged.description || this.isEnglish(merged.description)) {
-                const searchTitle = merged.title || title || ''
+                const searchTitle = this.hasRealTitle(merged, searchIsbn) ? merged.title : (title || '')
                 const searchAuthor = author || (merged.authors ? merged.authors[0] : '')
-                
-                if (searchTitle) {
-                    // Try Google Books first
+
+                if (searchTitle && !this.isIsbnLikeTitle(searchTitle, searchIsbn)) {
                     try {
                         const titleSearch = await this.fetchGoogleByTitle(searchTitle, searchAuthor)
                         if (titleSearch) {
                             merged.description = merged.description || titleSearch.description
                             merged.coverUrl = merged.coverUrl || titleSearch.coverUrl
+                            if ((!merged.authors || merged.authors.length === 0) && titleSearch.authors?.length) {
+                                merged.authors = titleSearch.authors
+                            }
                         }
                     } catch (e) {
                         console.warn('[MetadataService] Google Title search failed, trying OpenLibrary...')
@@ -127,22 +160,63 @@ export class MetadataService {
                         if (olTitleSearch) {
                             merged.description = merged.description || olTitleSearch.description
                             merged.coverUrl = merged.coverUrl || olTitleSearch.coverUrl
+                            if ((!merged.authors || merged.authors.length === 0) && olTitleSearch.authors?.length) {
+                                merged.authors = olTitleSearch.authors
+                            }
                         }
                     }
                 }
             }
 
             const finalMerged = this.finalizeMetadata(merged)
-            if (finalMerged && finalMerged.title && this.isErrorTitle(finalMerged.title)) {
-                console.warn(`[MetadataService] Rejecting error title after merge: ${finalMerged.title}`)
+            if (!this.isCompleteEnough(finalMerged, searchIsbn)) {
+                this.logLookup(`[Lookup] REJECT incomplete ${searchIsbn} (${Date.now() - started}ms): title="${finalMerged?.title}", authors=${finalMerged?.authors?.length || 0}, cover=${!!finalMerged?.coverUrl}`)
                 return null
             }
 
             this.cache.set(searchIsbn, finalMerged)
+            this.logLookup(`[Lookup] OK merge ${searchIsbn} (${Date.now() - started}ms): "${finalMerged.title}"`)
             return finalMerged
         }
 
+        this.logLookup(`[Lookup] MISS ${searchIsbn} (${Date.now() - started}ms)`)
         return null
+    }
+
+    /** Real title + (author OR cover). ISBN-as-title never counts. */
+    private isCompleteEnough(meta: Partial<BookMetadata> | null | undefined, isbn?: string): boolean {
+        if (!meta || !this.hasRealTitle(meta, isbn)) return false
+        if (this.isStorePromoText(meta.description)) return false
+        const hasAuthor = !!(meta.authors && meta.authors.some(a => !!a && a.trim().length > 1))
+        const hasCover = !!(meta.coverUrl && String(meta.coverUrl).trim())
+        return hasAuthor || hasCover
+    }
+
+    private hasRealTitle(meta: Partial<BookMetadata>, isbn?: string): boolean {
+        if (!meta.title || meta.title.trim().length < 3) return false
+        if (this.isErrorTitle(meta.title)) return false
+        if (this.isIsbnLikeTitle(meta.title, isbn || meta.isbn)) return false
+        return true
+    }
+
+    private isIsbnLikeTitle(title: string, isbn?: string): boolean {
+        const trimmed = title.trim()
+        const compact = trimmed.replace(/[\s\-]/g, '')
+        // Pure ISBN-10 / ISBN-13
+        if (/^\d{13}$/.test(compact) || /^\d{10}$/.test(compact) || /^\d{9}[\dX]$/i.test(compact)) return true
+
+        if (isbn) {
+            const normIsbn = isbn.replace(/[^0-9X]/gi, '').toUpperCase()
+            const titleDigits = trimmed.replace(/[^0-9X]/gi, '').toUpperCase()
+            if (titleDigits === normIsbn) return true
+        }
+
+        // "9789500731140 - Yenny - El Ateneo" after partial cleanup, or ISBN-only with junk
+        if (/^\d{10,13}(\s*[-–|:].*)?$/i.test(trimmed) && trimmed.replace(/[^0-9]/g, '').length >= 10) {
+            const nonDigit = trimmed.replace(/[\d\s\-–|:X]/gi, '')
+            if (nonDigit.length < 3) return true
+        }
+        return false
     }
 
     private isErrorTitle(title: string): boolean {
@@ -160,6 +234,7 @@ export class MetadataService {
         if (storeTitles.includes(lowerTitle)) return true
         if (/^yenny\b/i.test(lowerTitle) && /el ateneo/i.test(lowerTitle)) return true
         if (/^\d{10,13}\s*[-–|:]\s*(yenny|tematika|cúspide|cuspide|galerna)/i.test(title)) return true
+        if (this.isIsbnLikeTitle(title)) return true
         return false
     }
 
@@ -203,7 +278,10 @@ export class MetadataService {
         // Clean common SEO suffixes
         title = title.replace(/\s*[|\-]\s*Cúspide.*$/i, '')
         title = title.replace(/\s*[|\-]\s*Tematika.*$/i, '')
-        
+        title = title.replace(/\s*[|\-]\s*Yenny\s*[-–]\s*El Ateneo.*$/i, '')
+        title = title.replace(/\s*[|\-]\s*Yenny.*$/i, '')
+        title = title.replace(/\s*[|\-]\s*El Ateneo.*$/i, '')
+
         metadata.title = title.trim()
         return metadata
     }
@@ -234,8 +312,10 @@ export class MetadataService {
     }
 
     private mergeResults(results: BookMetadata[], isbn: string): BookMetadata | null {
+        // Keep sources with a real title; completeness is checked after merge
+        // so title from A + author/cover from B can still succeed.
         const valid = results.filter(r =>
-            r && r.title && !this.isErrorTitle(r.title) && !this.isStorePromoText(r.description)
+            r && this.hasRealTitle(r, isbn) && !this.isStorePromoText(r.description)
         )
         if (valid.length === 0) return null
 
