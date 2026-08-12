@@ -14,8 +14,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     const [error, setError] = useState('')
     const [activeTab, setActiveTab] = useState<'users' | 'utils' | 'shared'>('users')
     const [syncLogs, setSyncLogs] = useState<string[]>([])
+    const [optimizeLogs, setOptimizeLogs] = useState<string[]>([])
+    const [barcodeLogs, setBarcodeLogs] = useState<string[]>([])
     const [isSyncing, setIsSyncing] = useState(false)
     const [isOptimizing, setIsOptimizing] = useState(false)
+    const [isSyncingBarcodes, setIsSyncingBarcodes] = useState(false)
     const [sharedCovers, setSharedCovers] = useState<any[]>([])
     const [loadingShared, setLoadingShared] = useState(false)
 
@@ -144,20 +147,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     }
 
     const handleStartOptimize = async () => {
-        setSyncLogs(['Iniciando proceso de optimización global...'])
+        setOptimizeLogs(['Iniciando proceso de optimización global...'])
         setIsOptimizing(true)
         try {
             await dataService.optimizeGlobalImages((chunk) => {
-                setSyncLogs(prev => {
+                setOptimizeLogs(prev => {
                     const lines = chunk.split('\n').filter(l => l.trim())
                     return [...prev, ...lines]
                 })
             })
             loadSharedCovers()
         } catch (e: any) {
-            setSyncLogs(prev => [...prev, `[ERROR FATAL] ${e.message}`])
+            setOptimizeLogs(prev => [...prev, `[ERROR FATAL] ${e.message}`])
         } finally {
             setIsOptimizing(false)
+        }
+    }
+
+    const handleStartSyncBarcodes = async () => {
+        setBarcodeLogs(['Iniciando verificación de ISBN / Códigos de barras...'])
+        setIsSyncingBarcodes(true)
+        try {
+            await dataService.syncBarcodes((chunk) => {
+                setBarcodeLogs(prev => {
+                    const lines = chunk.split('\n').filter(l => l.trim())
+                    return [...prev, ...lines]
+                })
+            })
+        } catch (e: any) {
+            setBarcodeLogs(prev => [...prev, `[ERROR FATAL] ${e.message}`])
+        } finally {
+            setIsSyncingBarcodes(false)
         }
     }
 
@@ -374,11 +394,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                         className="create-btn" 
                                         style={{ width: 'auto', padding: '12px 30px' }}
                                         onClick={handleStartSync}
-                                        disabled={isSyncing || isOptimizing}
+                                        disabled={isSyncing || isOptimizing || isSyncingBarcodes}
                                     >
                                         {isSyncing ? 'Sincronizando...' : 'Comenzar Sincronización'}
                                     </button>
                                 </div>
+                                {syncLogs.length > 0 && (
+                                    <div className="log-console">
+                                        <div className="log-header">
+                                            <Terminal size={14} /> Consola de Salida
+                                        </div>
+                                        <div className="log-content">
+                                            {syncLogs.map((log, i) => (
+                                                <div key={i} className="log-line">{log}</div>
+                                            ))}
+                                            {isSyncing && <div className="log-cursor">_</div>}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="admin-card sync-card">
@@ -393,22 +426,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                         className="create-btn" 
                                         style={{ width: 'auto', padding: '12px 30px' }}
                                         onClick={handleStartOptimize}
-                                        disabled={isSyncing || isOptimizing}
+                                        disabled={isSyncing || isOptimizing || isSyncingBarcodes}
                                     >
                                         {isOptimizing ? 'Optimizando...' : 'Comenzar Optimización'}
                                     </button>
                                 </div>
 
-                                {syncLogs.length > 0 && (
+                                {optimizeLogs.length > 0 && (
                                     <div className="log-console">
                                         <div className="log-header">
                                             <Terminal size={14} /> Consola de Salida
                                         </div>
                                         <div className="log-content">
-                                            {syncLogs.map((log, i) => (
+                                            {optimizeLogs.map((log, i) => (
                                                 <div key={i} className="log-line">{log}</div>
                                             ))}
-                                            {(isSyncing || isOptimizing) && <div className="log-cursor">_</div>}
+                                            {isOptimizing && <div className="log-cursor">_</div>}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="admin-card sync-card">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '30px' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <h3><RefreshCw size={20} className={isSyncingBarcodes ? 'spin-anim' : ''} /> Verificación ISBN / Código de Barras</h3>
+                                        <p style={{ fontSize: '0.9rem', color: '#888', maxWidth: '600px', margin: '10px 0 0' }}>
+                                            Para todos los libros sin código de barras, copia el ISBN actual como valor inicial del campo <em>barcode</em>.
+                                        </p>
+                                    </div>
+                                    <button 
+                                        className="create-btn" 
+                                        style={{ width: 'auto', padding: '12px 30px' }}
+                                        onClick={handleStartSyncBarcodes}
+                                        disabled={isSyncing || isOptimizing || isSyncingBarcodes}
+                                    >
+                                        {isSyncingBarcodes ? 'Verificando...' : 'Iniciar Verificación'}
+                                    </button>
+                                </div>
+
+                                {barcodeLogs.length > 0 && (
+                                    <div className="log-console">
+                                        <div className="log-header">
+                                            <Terminal size={14} /> Consola de Salida
+                                        </div>
+                                        <div className="log-content">
+                                            {barcodeLogs.map((log, i) => (
+                                                <div key={i} className="log-line">{log}</div>
+                                            ))}
+                                            {isSyncingBarcodes && <div className="log-cursor">_</div>}
                                         </div>
                                     </div>
                                 )}

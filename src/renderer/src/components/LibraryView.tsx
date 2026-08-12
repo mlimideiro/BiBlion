@@ -79,7 +79,8 @@ export const LibraryView: React.FC<Props> = ({
             result = result.filter(b =>
                 b.title.toLowerCase().includes(q) ||
                 b.authors.some(a => a.toLowerCase().includes(q)) ||
-                b.isbn.includes(q)
+                b.isbn.includes(q) ||
+                (b.barcode && b.barcode.includes(q))
             )
         }
 

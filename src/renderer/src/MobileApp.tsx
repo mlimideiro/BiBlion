@@ -245,7 +245,7 @@ const MobileApp: React.FC = () => {
         updateStatus(`Buscando ${isbn}...`, 'processing')
 
         try {
-            const res = await axios.get(`/api/lookup/${isbn}`)
+            const res = await axios.get(`/api/lookup/${isbn}`, { params: { username: currentUser || undefined } })
             setPendingBooks(prev => prev.map(b =>
                 b.isbn === currentIsbn ? { ...res.data, isbn: currentIsbn, status: 'ready' } : b
             ))

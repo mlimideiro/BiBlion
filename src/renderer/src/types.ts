@@ -1,5 +1,6 @@
 export interface Book {
     isbn: string
+    barcode?: string  // Código de barras (EAN-13), puede diferir del ISBN
     title: string
     authors: string[]
     publisher?: string

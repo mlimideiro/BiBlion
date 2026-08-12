@@ -183,6 +183,50 @@ export class AdminUtils {
     logCallback(`Espacio recuperado: ${Math.round(totalSaved / 1024)} KB`)
   }
 
+  async syncBarcodesFromIsbn(logCallback: (msg: string) => void) {
+    const USERS_ROOT = path.join(process.cwd(), 'db_biblion', 'users')
+    if (!fs.existsSync(USERS_ROOT)) {
+      logCallback('Error: No se encontró el directorio de usuarios.')
+      return
+    }
+
+    const users = fs.readdirSync(USERS_ROOT).filter(f =>
+      fs.statSync(path.join(USERS_ROOT, f)).isDirectory()
+    )
+
+    logCallback(`Encontrados ${users.length} usuario(s). Iniciando verificación...`)
+    let totalFixed = 0
+    let totalSkipped = 0
+
+    for (const username of users) {
+      logCallback(`\n>>> Procesando usuario: [${username}]`)
+      const books = this.dataManager.getAllBooks(username)
+      let modified = false
+
+      for (const book of books) {
+        if (!book.barcode || book.barcode.trim() === '') {
+          book.barcode = book.isbn
+          modified = true
+          totalFixed++
+          logCallback(`  [OK] "${book.title}": barcode <- "${book.isbn}"`)
+        } else {
+          totalSkipped++
+        }
+      }
+
+      if (modified) {
+        this.dataManager.saveBooks(username, books)
+        logCallback(`  [Guardado] Libros de ${username} actualizados.`)
+      } else {
+        logCallback(`  [Info] Todos los libros de ${username} ya tenían código de barras.`)
+      }
+    }
+
+    logCallback(`\n--- Verificación Finalizada ---`)
+    logCallback(`Libros actualizados: ${totalFixed}`)
+    logCallback(`Libros ya completos: ${totalSkipped}`)
+  }
+
   private async downloadCover(url: string, dest: string): Promise<boolean> {
     try {
       let coverReferer = 'https://www.google.com/'

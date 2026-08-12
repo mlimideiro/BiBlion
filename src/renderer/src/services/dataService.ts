@@ -142,6 +142,25 @@ export const dataService = {
         }
     },
 
+    async syncBarcodes(onProgress: (msg: string) => void) {
+        try {
+            const response = await fetch(`${API_BASE}/admin/sync-barcodes`, { method: 'POST' })
+            const reader = response.body?.getReader()
+            const decoder = new TextDecoder()
+            if (!reader) return
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                const chunk = decoder.decode(value, { stream: true })
+                onProgress(chunk)
+            }
+        } catch (e) {
+            console.error('Sync barcodes error:', e)
+            onProgress('Error crítico en el servidor.')
+        }
+    },
+
     async getSharedCovers(): Promise<any[]> {
         try {
             const res = await axios.get(`${API_BASE}/admin/shared-covers`)

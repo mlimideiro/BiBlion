@@ -148,7 +148,8 @@ function App() {
                 const authors = Array.isArray(b.authors) ? b.authors.map(a => normalizeText(a || '')) : []
                 return title.includes(normalizedQuery) ||
                     authors.some(a => a.includes(normalizedQuery)) ||
-                    (b.isbn && b.isbn.includes(searchQuery))
+                    (b.isbn && b.isbn.includes(searchQuery)) ||
+                    (b.barcode && b.barcode.includes(searchQuery))
             })
         }
 
@@ -1024,6 +1025,13 @@ function App() {
                                                     onBlur={(e) => handleEditSave({ isbn: e.target.value })}
                                                     placeholder="ISBN del libro"
                                                 />
+                                                <input
+                                                    key={`barcode-${selectedBook.barcode || ''}`}
+                                                    className="edit-input"
+                                                    defaultValue={selectedBook.barcode || ''}
+                                                    onBlur={(e) => handleEditSave({ barcode: e.target.value || undefined })}
+                                                    placeholder="Código de barras (si difiere del ISBN)"
+                                                />
                                                 <div style={{ display: 'flex', gap: '10px' }}>
                                                     <input
                                                         key={`publisher-${selectedBook.publisher || ''}`}
@@ -1068,6 +1076,9 @@ function App() {
                                                 <p className="modal-author">{selectedBook.authors.join(', ')}</p>
                                                 <div className="modal-meta">
                                                     <p><strong>ISBN:</strong> {selectedBook.isbn}</p>
+                                                    {selectedBook.barcode && selectedBook.barcode !== selectedBook.isbn && (
+                                                        <p><strong>Código de barras:</strong> {selectedBook.barcode}</p>
+                                                    )}
                                                     {selectedBook.publisher && <p><strong>Editorial:</strong> {selectedBook.publisher}</p>}
                                                     {selectedBook.pageCount && <p><strong>Páginas:</strong> {selectedBook.pageCount}</p>}
 

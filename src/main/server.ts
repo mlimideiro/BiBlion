@@ -240,10 +240,27 @@ export function startServer(
         }
     })
 
+    app.post('/api/admin/sync-barcodes', async (_req, res) => {
+        console.log('[Admin] Request for sync-barcodes...')
+        res.setHeader('Content-Type', 'text/plain')
+        res.setHeader('Transfer-Encoding', 'chunked')
+
+        try {
+            await adminUtils.syncBarcodesFromIsbn((msg) => {
+                res.write(msg + '\n')
+            })
+            res.end()
+        } catch (error: any) {
+            console.error('[Admin] Global error during sync-barcodes:', error)
+            res.write('\n[FATAL ERROR] ' + error.message)
+            res.end()
+        }
+    })
+
     app.get('/api/lookup/:isbn', async (req, res) => {
         const { isbn } = req.params
-        const { title, author } = req.query
-        console.log(`[Lookup] ISBN: ${isbn}, Title: ${title || '(none)'}, Author: ${author || '(none)'}`)
+        const { title, author, username } = req.query
+        console.log(`[Lookup] ISBN/Barcode: ${isbn}, Title: ${title || '(none)'}, Author: ${author || '(none)'}`)
 
         try {
             const metadata = await metadataService.lookup(isbn, title as string, author as string)
@@ -251,7 +268,25 @@ export function startServer(
                 console.log(`[Lookup Success] Found: ${metadata.title}`)
                 res.json(metadata)
             } else {
-                console.warn(`[Lookup Failed] No results for ISBN: ${isbn}`)
+                // Fallback: if a username was provided, check if this code matches a barcode in their library
+                if (username) {
+                    try {
+                        const userBooks = dataManager.getAllBooks(username as string)
+                        const cleanCode = isbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+                        const byBarcode = userBooks.find(b =>
+                            (b.barcode && b.barcode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() === cleanCode) ||
+                            (b.isbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() === cleanCode)
+                        )
+                        if (byBarcode) {
+                            console.log(`[Lookup Fallback] Found by barcode in user library: "${byBarcode.title}"`)
+                            res.json({ ...byBarcode, _foundByBarcode: true })
+                            return
+                        }
+                    } catch (e) {
+                        // If we can't read user books, just continue to 404
+                    }
+                }
+                console.warn(`[Lookup Failed] No results for: ${isbn}`)
                 res.status(404).json({ error: 'Book not found' })
             }
         } catch (error) {
