@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { X, Search, Book as BookIcon, User, HandHelping, RotateCcw } from 'lucide-react'
 import { Book } from '../types'
 import { dataService } from '../services/dataService'
+import { normalizeText, matchesBookSearch } from '../utils/textUtils'
 
 interface Props {
     books: Book[]
@@ -18,30 +19,13 @@ export const LoansModal: React.FC<Props> = ({ books, onSaveBook, onClose }) => {
     const [activeTab, setActiveTab] = useState<'manage' | 'list'>('manage')
     const [activeSearch, setActiveSearch] = useState('')
 
-    const normalizeText = (text: string) => {
-        return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-    }
-
     useEffect(() => {
         if (!searchQuery.trim()) {
             setFilteredResults([])
             return
         }
 
-        const searchTerms = normalizeText(searchQuery).split(/\s+/).filter(t => t.length > 0)
-
-        const results = books.filter(b => {
-            const bookTitle = normalizeText(b.title)
-            const bookAuthors = (b.authors || []).map(a => normalizeText(a)).join(' ')
-            const bookIsbn = b.isbn || ''
-
-            // At least one word must match ISBN for quick search, 
-            // OR ALL search terms must be found within the combined Title + Authors string
-            const fullText = `${bookTitle} ${bookAuthors}`
-
-            return searchTerms.every(term => fullText.includes(term)) || bookIsbn.includes(searchQuery.trim())
-        }).slice(0, 15) // Increased limit further for safety
-
+        const results = books.filter(b => matchesBookSearch(b, searchQuery)).slice(0, 15)
         setFilteredResults(results)
     }, [searchQuery, books])
 
@@ -161,7 +145,7 @@ export const LoansModal: React.FC<Props> = ({ books, onSaveBook, onClose }) => {
                                             outline: 'none',
                                             margin: 0
                                         }}
-                                        placeholder="Buscar por título o ISBN..."
+                                        placeholder="Buscar por título, autor, editorial o ISBN..."
                                         value={searchQuery}
                                         onChange={e => setSearchQuery(e.target.value)}
                                         autoFocus
@@ -354,6 +338,7 @@ export const LoansModal: React.FC<Props> = ({ books, onSaveBook, onClose }) => {
                                         searchTerms.every(term =>
                                             normalizeText(b.title).includes(term) ||
                                             normalizeText(b.borrowerName || '').includes(term) ||
+                                            normalizeText(b.publisher || '').includes(term) ||
                                             (b.authors || []).some(a => normalizeText(a).includes(term))
                                         )
                                     ));

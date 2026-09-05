@@ -5,6 +5,7 @@ import { SearchBar, SizeSelector } from './SearchBar'
 import { SortControls, SortField, SortDirection } from './SortControls'
 import { dataService } from '../services/dataService'
 import { X, Sparkles, Trash2, ChevronRight, HandHelping } from 'lucide-react'
+import { matchesBookSearch, normalizeText } from '../utils/textUtils'
 
 interface Props {
     books: Book[]
@@ -75,13 +76,7 @@ export const LibraryView: React.FC<Props> = ({
 
         // 2. Filter by Search
         if (searchQuery) {
-            const q = searchQuery.toLowerCase()
-            result = result.filter(b =>
-                b.title.toLowerCase().includes(q) ||
-                b.authors.some(a => a.toLowerCase().includes(q)) ||
-                b.isbn.includes(q) ||
-                (b.barcode && b.barcode.includes(q))
-            )
+            result = result.filter(b => matchesBookSearch(b, searchQuery))
         }
 
         // 3. Filter by Tag
@@ -92,15 +87,15 @@ export const LibraryView: React.FC<Props> = ({
         // 4. Sort
         if (sortField === 'title') {
             result = [...result].sort((a, b) => {
-                const titleA = (a.title || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-                const titleB = (b.title || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                const titleA = normalizeText(a.title)
+                const titleB = normalizeText(b.title)
                 const comp = titleA.localeCompare(titleB)
                 return sortDirection === 'asc' ? comp : -comp
             })
         } else if (sortField === 'author') {
             result = [...result].sort((a, b) => {
-                const authorA = (Array.isArray(a.authors) && a.authors.length > 0 ? a.authors[0] : '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-                const authorB = (Array.isArray(b.authors) && b.authors.length > 0 ? b.authors[0] : '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                const authorA = normalizeText(Array.isArray(a.authors) && a.authors.length > 0 ? a.authors[0] : '')
+                const authorB = normalizeText(Array.isArray(b.authors) && b.authors.length > 0 ? b.authors[0] : '')
                 const comp = authorA.localeCompare(authorB)
                 return sortDirection === 'asc' ? comp : -comp
             })

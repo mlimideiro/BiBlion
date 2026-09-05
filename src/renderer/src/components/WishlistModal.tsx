@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { X, Search, Gift, Star, Trash2, CheckCircle2, Plus, RefreshCw, Globe, ArrowLeft } from 'lucide-react'
 import { dataService } from '../services/dataService'
 import { Book, Config } from '../types'
+import { matchesBookSearch } from '../utils/textUtils'
 
 interface Props {
     books: Book[]
@@ -53,15 +54,9 @@ export const WishlistModal: React.FC<Props> = ({ books, config, onSaveBook, onPu
         notes: ''
     })
 
-    const normalizeText = (text: string) => {
-        return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-    }
-
     const wishlistBooks = books.filter(b => b.status === 'wishlist').filter(b => {
         if (!searchQuery.trim()) return true
-        const q = normalizeText(searchQuery)
-        return normalizeText(b.title).includes(q) ||
-            (b.authors || []).some(a => normalizeText(a).includes(q))
+        return matchesBookSearch(b, searchQuery)
     })
 
     const handleUpdateWish = (updates: Partial<Book>) => {

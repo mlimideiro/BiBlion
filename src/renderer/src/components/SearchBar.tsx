@@ -18,7 +18,7 @@ export const SearchBar: React.FC<SearchProps> = ({ onSearch }) => {
         <div className="search-bar">
             <input
                 type="text"
-                placeholder="Buscar por título, autor o ISBN..."
+                placeholder="Buscar por título, autor, editorial o ISBN..."
                 value={query}
                 onChange={handleChange}
                 className="search-input"

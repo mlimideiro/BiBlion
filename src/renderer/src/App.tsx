@@ -13,6 +13,7 @@ import { AdminDashboard } from './components/AdminDashboard'
 import { LoansModal } from './components/LoansModal'
 import { WishlistModal } from './components/WishlistModal'
 import { SortControls, SortField, SortDirection } from './components/SortControls'
+import { normalizeText, matchesBookSearch } from './utils/textUtils'
 
 
 function App() {
@@ -142,15 +143,7 @@ function App() {
 
         // 2. Filter by search query
         if (searchQuery) {
-            const normalizedQuery = normalizeText(searchQuery)
-            result = result.filter(b => {
-                const title = normalizeText(b.title || '')
-                const authors = Array.isArray(b.authors) ? b.authors.map(a => normalizeText(a || '')) : []
-                return title.includes(normalizedQuery) ||
-                    authors.some(a => a.includes(normalizedQuery)) ||
-                    (b.isbn && b.isbn.includes(searchQuery)) ||
-                    (b.barcode && b.barcode.includes(searchQuery))
-            })
+            result = result.filter(b => matchesBookSearch(b, searchQuery))
         }
 
         // 3. Filter by tag
@@ -161,15 +154,15 @@ function App() {
         // 4. Sort
         if (sortField === 'title') {
             result = [...result].sort((a, b) => {
-                const titleA = (a.title || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-                const titleB = (b.title || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                const titleA = normalizeText(a.title)
+                const titleB = normalizeText(b.title)
                 const comp = titleA.localeCompare(titleB)
                 return sortDirection === 'asc' ? comp : -comp
             })
         } else if (sortField === 'author') {
             result = [...result].sort((a, b) => {
-                const authorA = (Array.isArray(a.authors) && a.authors.length > 0 ? a.authors[0] : '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-                const authorB = (Array.isArray(b.authors) && b.authors.length > 0 ? b.authors[0] : '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                const authorA = normalizeText(Array.isArray(a.authors) && a.authors.length > 0 ? a.authors[0] : '')
+                const authorB = normalizeText(Array.isArray(b.authors) && b.authors.length > 0 ? b.authors[0] : '')
                 const comp = authorA.localeCompare(authorB)
                 return sortDirection === 'asc' ? comp : -comp
             })
@@ -185,10 +178,6 @@ function App() {
         } else {
             setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
         }
-    }
-
-    const normalizeText = (text: string) => {
-        return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
     }
 
     const handleSearch = (query: string) => {
