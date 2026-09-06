@@ -192,7 +192,11 @@ export const dataService = {
     },
 
     async importBackupZip(username: string, zipData: string, mode: 'merge' | 'replace'): Promise<{ books: Book[], config: Config }> {
-        const res = await axios.post(`${API_BASE}/backup/import`, { username, zipData, mode })
+        const res = await axios.post(`${API_BASE}/backup/import`, { username, zipData, mode }, {
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            timeout: 300000
+        })
         return {
             books: res.data.books,
             config: res.data.config

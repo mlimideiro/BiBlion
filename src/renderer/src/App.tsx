@@ -297,19 +297,28 @@ function App() {
             } else if (importFile.name.endsWith('.zip')) {
                 const reader = new FileReader()
                 reader.onload = async (e) => {
-                    const result = await dataService.importBackupZip(currentUser, base64, mode)
-                    if (result.books) setBooks(result.books)
-                    if (result.config) setConfig(result.config)
-                    setImportModalOpen(false)
-                    setImportFile(null)
-                    alert(`Importación ZIP completada con éxito.`)
+                    try {
+                        const base64 = (e.target?.result as string).split(',')[1]
+                        const result = await dataService.importBackupZip(currentUser, base64, mode)
+                        if (result.books) setBooks(result.books)
+                        if (result.config) setConfig(result.config)
+                        setImportModalOpen(false)
+                        setImportFile(null)
+                        alert(`Importación ZIP completada con éxito.`)
+                    } catch (error: any) {
+                        const msg = error.response?.data?.error || error.message || "Error desconocido"
+                        alert(`Error durante la importación: ${msg}`)
+                        console.error("Import error:", error)
+                    } finally {
+                        setImporting(false)
+                    }
                 }
                 reader.readAsDataURL(importFile)
             }
-        } catch (error) {
-            alert("Error durante la importación.")
+        } catch (error: any) {
+            const msg = error.response?.data?.error || error.message || "Error desconocido"
+            alert(`Error durante la importación: ${msg}`)
             console.error("Import error:", error)
-        } finally {
             setImporting(false)
         }
     }

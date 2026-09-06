@@ -20,8 +20,8 @@ export function startServer(
     const app = express()
     const PORT = 3000
 
-    app.use(express.json({ limit: '50mb' }))
-    app.use(express.urlencoded({ limit: '50mb', extended: true }))
+    app.use(express.json({ limit: '500mb' }))
+    app.use(express.urlencoded({ limit: '500mb', extended: true }))
     app.use(cors())
 
     const USERS_FILE = path.join(process.cwd(), 'db_biblion', 'users.json')
