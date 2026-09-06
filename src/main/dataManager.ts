@@ -287,16 +287,16 @@ export class DataManager {
         return books
     }
 
-    public importBooks(username: string, importedBooks: Book[], mode: 'merge' | 'replace') {
+    public importBooks(username: string, importedBooks: Book[], mode: 'merge' | 'replace', preserveLibraries: boolean = false) {
         const { books: booksFile } = this.getUserPaths(username)
         let currentBooks = this.getAllBooks(username)
 
-        console.log(`[DataManager] Importing ${importedBooks.length} books for ${username} in mode: ${mode}`)
+        console.log(`[DataManager] Importing ${importedBooks.length} books for ${username} in mode: ${mode} (preserveLibraries: ${preserveLibraries})`)
 
         // Always backup first
         this.createBackup(currentBooks, username)
 
-        // Normalize and reset libraryId to ensure they are visible (unassigned)
+        // Normalize books
         const preparedBooks = importedBooks.map(bookInput => {
             const book = this.normalizeBook(bookInput)
             let newCoverPath = book.coverPath
@@ -311,8 +311,7 @@ export class DataManager {
                 ...book,
                 isbn: this.normalizeIsbn(book.isbn),
                 coverPath: newCoverPath,
-                // Reset libraryId so they appear in "Unassigned"
-                libraryId: "",
+                libraryId: preserveLibraries ? (book.libraryId || "") : "",
                 // Ensure dates exist (already handled by normalizeBook but being explicit)
                 createdAt: book.createdAt || new Date().toISOString(),
                 updatedAt: book.updatedAt || new Date().toISOString()
@@ -326,6 +325,91 @@ export class DataManager {
             // Merge mode using existing saveBooks logic which handles updates/inserts
             return this.saveBooks(username, preparedBooks)
         }
+    }
+
+    public restoreOrMergeConfig(
+        username: string,
+        importedConfig: Partial<Config> | null,
+        importedBooks: Book[],
+        mode: 'replace' | 'merge'
+    ): Config {
+        const currentConfig = this.getConfig(username)
+
+        let targetLibraries: Library[] = []
+        let targetTags: string[] = []
+        let activeLibraryId = currentConfig.activeLibraryId || ""
+
+        if (mode === 'replace') {
+            if (importedConfig && Array.isArray(importedConfig.libraries) && importedConfig.libraries.length > 0) {
+                targetLibraries = [...importedConfig.libraries]
+            } else {
+                targetLibraries = currentConfig.libraries?.length ? [...currentConfig.libraries] : [{ id: 'default', name: 'Principal' }]
+            }
+
+            if (importedConfig && Array.isArray(importedConfig.tags)) {
+                targetTags = [...importedConfig.tags]
+            } else {
+                targetTags = []
+            }
+
+            if (importedConfig?.activeLibraryId) {
+                activeLibraryId = importedConfig.activeLibraryId
+            }
+        } else {
+            // Merge mode
+            targetLibraries = [...(currentConfig.libraries || [])]
+            targetTags = [...(currentConfig.tags || [])]
+
+            if (importedConfig && Array.isArray(importedConfig.libraries)) {
+                for (const lib of importedConfig.libraries) {
+                    if (!targetLibraries.some(l => l.id === lib.id)) {
+                        targetLibraries.push(lib)
+                    }
+                }
+            }
+
+            if (importedConfig && Array.isArray(importedConfig.tags)) {
+                for (const t of importedConfig.tags) {
+                    if (t && !targetTags.includes(t)) {
+                        targetTags.push(t)
+                    }
+                }
+            }
+        }
+
+        // Ensure libraries referenced by any book exist
+        for (const book of importedBooks) {
+            if (book.libraryId && !targetLibraries.some(l => l.id === book.libraryId)) {
+                targetLibraries.push({
+                    id: book.libraryId,
+                    name: `Biblioteca ${book.libraryId}`
+                })
+            }
+
+            // Ensure tags referenced by any book exist in config.tags
+            if (Array.isArray(book.tags)) {
+                for (const t of book.tags) {
+                    if (t && !targetTags.includes(t)) {
+                        targetTags.push(t)
+                    }
+                }
+            }
+        }
+
+        // If targetLibraries is still empty for some reason, ensure default
+        if (targetLibraries.length === 0) {
+            targetLibraries.push({ id: 'default', name: 'Principal' })
+        }
+
+        const finalConfig: Config = {
+            libraries: targetLibraries,
+            activeLibraryId: targetLibraries.some(l => l.id === activeLibraryId) ? activeLibraryId : "",
+            tags: targetTags
+        }
+
+        this.saveConfig(username, finalConfig)
+        console.log(`[DataManager] Config restored/merged for ${username}: ${targetLibraries.length} libraries, ${targetTags.length} tags`)
+        return finalConfig
     }
 
     private createBackup(books: Book[], username: string) {

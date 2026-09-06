@@ -498,36 +498,15 @@ export function startServer(
                 zip.addLocalFile(configFile)
             }
 
-            // 2. Add covers (ONLY manual ones)
-            if (fs.existsSync(coversDir) && fs.existsSync(booksFile)) {
-                const books = JSON.parse(fs.readFileSync(booksFile, 'utf8'))
-                const manualFilenames = new Set<string>()
-
-                books.forEach((book: any) => {
-                    if (book.coverType === 'manual' && book.coverPath?.startsWith('local:')) {
-                        const parts = book.coverPath.split(':')
-                        if (parts.length === 3) {
-                            manualFilenames.add(parts[2])
-                        }
-                    }
-                })
-
-                // Also include anything starting with MANUAL in the filename (for safety/manual books)
+            // 2. Add covers (ALL covers of the user)
+            if (fs.existsSync(coversDir)) {
                 const allFiles = fs.readdirSync(coversDir)
-                allFiles.forEach(f => {
-                    if (f.toUpperCase().startsWith('MANUAL')) {
-                        manualFilenames.add(f)
+                allFiles.forEach(filename => {
+                    const filePath = path.join(coversDir, filename)
+                    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+                        zip.addLocalFile(filePath, 'covers')
                     }
                 })
-
-                if (manualFilenames.size > 0) {
-                    manualFilenames.forEach(filename => {
-                        const filePath = path.join(coversDir, filename)
-                        if (fs.existsSync(filePath)) {
-                            zip.addLocalFile(filePath, 'covers')
-                        }
-                    })
-                }
             }
 
             const buffer = zip.toBuffer()
@@ -563,9 +542,10 @@ export function startServer(
 
             // 1. Extract and find JSON data first
             zipEntries.forEach((entry) => {
-                if (entry.entryName === 'books.json') {
+                const entryName = entry.entryName.replace(/\\/g, '/')
+                if (entryName === 'books.json') {
                     booksJson = JSON.parse(entry.getData().toString('utf8'))
-                } else if (entry.entryName === 'config.json') {
+                } else if (entryName === 'config.json') {
                     configJson = JSON.parse(entry.getData().toString('utf8'))
                 }
             })
@@ -576,8 +556,9 @@ export function startServer(
 
             // 2. Restore covers
             zipEntries.forEach((entry) => {
-                if (entry.entryName.startsWith('covers/') && !entry.isDirectory) {
-                    const filename = entry.entryName.split('/').pop()
+                const entryName = entry.entryName.replace(/\\/g, '/')
+                if (entryName.startsWith('covers/') && !entry.isDirectory) {
+                    const filename = entryName.split('/').pop()
                     if (filename) {
                         const targetPath = path.join(coversDir, filename)
                         fs.writeFileSync(targetPath, entry.getData())
@@ -585,19 +566,32 @@ export function startServer(
                 }
             })
 
-            // 3. Update Database
-            if (mode === 'replace') {
-                dataManager.importBooks(username, booksJson, 'replace')
-                if (configJson) dataManager.saveConfig(username, configJson)
-            } else {
-                // Merge mode
-                dataManager.importBooks(username, booksJson, 'merge')
-                // For config, we usually don't want to overwrite libraries/tags in merge mode 
-                // unless they are completely missing.
+            // 3. Update Database (preserve libraries and restore/merge config)
+            const updatedBooks = dataManager.importBooks(username, booksJson, mode, true)
+            const updatedConfig = dataManager.restoreOrMergeConfig(username, configJson, updatedBooks, mode)
+
+            // 4. Fallback cover download for any missing files that have remote URLs
+            let queuedCount = 0
+            let delay = 0
+            for (const book of updatedBooks) {
+                const filename = book.coverPath?.startsWith('local:')
+                    ? book.coverPath.split(':')[2]
+                    : `${book.isbn.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}.jpg`
+                const localCoverPath = path.join(coversDir, filename)
+                const url = book.coverUrl || (book.coverPath?.startsWith('http') ? book.coverPath : null)
+
+                if (!fs.existsSync(localCoverPath) && url && url.startsWith('http')) {
+                    queuedCount++
+                    setTimeout(() => downloadCoverToLocal(username, book.isbn, url), delay)
+                    delay += 300
+                }
+            }
+            if (queuedCount > 0) {
+                console.log(`[Backup Import] Queued fallback cover downloads for ${queuedCount} books. Estimation: ${Math.round(delay/1000)}s`)
             }
 
             console.log(`[Backup] Import successful for ${username}`)
-            res.json({ success: true, books: dataManager.getAllBooks(username) })
+            res.json({ success: true, books: dataManager.getAllBooks(username), config: updatedConfig })
         } catch (error) {
             console.error('[Backup] Import error:', error)
             res.status(500).json({ error: (error as Error).message })

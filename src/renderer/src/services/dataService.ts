@@ -191,8 +191,11 @@ export const dataService = {
         document.body.removeChild(link)
     },
 
-    async importBackupZip(username: string, zipData: string, mode: 'merge' | 'replace'): Promise<Book[]> {
+    async importBackupZip(username: string, zipData: string, mode: 'merge' | 'replace'): Promise<{ books: Book[], config: Config }> {
         const res = await axios.post(`${API_BASE}/backup/import`, { username, zipData, mode })
-        return res.data.books
+        return {
+            books: res.data.books,
+            config: res.data.config
+        }
     }
 }

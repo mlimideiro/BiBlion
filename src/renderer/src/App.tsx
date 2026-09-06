@@ -297,9 +297,9 @@ function App() {
             } else if (importFile.name.endsWith('.zip')) {
                 const reader = new FileReader()
                 reader.onload = async (e) => {
-                    const base64 = (e.target?.result as string).split(',')[1]
-                    const updatedBooks = await dataService.importBackupZip(currentUser, base64, mode)
-                    setBooks(updatedBooks)
+                    const result = await dataService.importBackupZip(currentUser, base64, mode)
+                    if (result.books) setBooks(result.books)
+                    if (result.config) setConfig(result.config)
                     setImportModalOpen(false)
                     setImportFile(null)
                     alert(`Importación ZIP completada con éxito.`)
